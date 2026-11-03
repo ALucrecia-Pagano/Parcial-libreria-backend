@@ -1,0 +1,10 @@
+# Secretos: nunca al repo
+.env
+
+# Entornos virtuales y basura de Python, en cualquier subcarpeta
+.venv/
+__pycache__/
+*.pyc
+
+# Configuración del editor
+.idea/

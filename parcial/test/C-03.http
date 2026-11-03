@@ -1,0 +1,11 @@
+@api = http://localhost:8000
+
+### C-03: Segundo perfil para el mismo cliente
+# Resultado esperado: 409
+POST {{api}}/clientes/1/perfil
+Content-Type: application/json
+
+{
+  "telefono": "123456789",
+  "direccion": "Calle Falsa 123"
+}

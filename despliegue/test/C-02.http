@@ -1,0 +1,11 @@
+@api = http://localhost:8000
+
+### C-02: ISBN o email repetido
+# Resultado esperado: 409 con mensaje propio
+POST {{api}}/clientes/
+Content-Type: application/json
+
+{
+  "nombre": "Mateo",
+  "email": "mismo_email@example.com"
+}

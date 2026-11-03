@@ -1,0 +1,14 @@
+@api = http://localhost:8000
+
+### C-06: Venta válida con dos renglones
+# Resultado esperado: 201, con los renglones creados, los precios copiados y el total calculado
+POST {{api}}/ventas/
+Content-Type: application/json
+
+{
+  "cliente_id": 1,
+  "renglones": [
+    { "libro_id": 1, "cantidad": 2 },
+    { "libro_id": 2, "cantidad": 1 }
+  ]
+}

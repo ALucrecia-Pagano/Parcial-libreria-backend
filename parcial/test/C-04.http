@@ -1,0 +1,16 @@
+@api = http://localhost:8000
+
+### C-04: Libro con una editorial o un autor inexistente
+# Resultado esperado: 409 con mensaje propio
+POST {{api}}/libros/
+Content-Type: application/json
+
+{
+  "isbn": "978-000-00-0000-0",
+  "titulo": "Libro Imposible",
+  "precio": "10000.00",
+  "stock": 10,
+  "editorial_id": 9999,
+  "genero_id": 1,
+  "autores": []
+}

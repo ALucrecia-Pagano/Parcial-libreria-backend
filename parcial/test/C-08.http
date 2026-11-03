@@ -1,0 +1,5 @@
+@api = http://localhost:8000
+
+### C-08: Búsqueda por título con inyección SQL
+# Resultado esperado: 200 con lista vacía (demuestra uso de parámetros ligados)
+GET {{api}}/libros/?titulo=' OR '1'='1

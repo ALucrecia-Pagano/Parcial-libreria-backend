@@ -1,0 +1,20 @@
+# Secretos: la configuración real entra con --env-file al correr, nunca en la imagen
+.env
+
+# Entorno virtual: la imagen instala sus propias dependencias desde requirements.txt
+.venv/
+
+# Historial de git: puede tener contraseñas viejas y no sirve para correr la app
+.git
+
+# Basura que genera Python solo
+__pycache__/
+**/__pycache__/
+*.pyc
+
+# Cosas que no hacen falta para correr la API
+test/
+docs/
+evidencia/
+DEPLOY.md
+*.pdf

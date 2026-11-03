@@ -1,0 +1,13 @@
+@api = http://localhost:8000
+
+### C-05: Venta con un libro o un cliente inexistente
+# Resultado esperado: 409
+POST {{api}}/ventas/
+Content-Type: application/json
+
+{
+  "cliente_id": 9999,
+  "renglones": [
+    { "libro_id": 1, "cantidad": 1 }
+  ]
+}

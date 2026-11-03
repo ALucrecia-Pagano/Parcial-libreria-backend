@@ -1,0 +1,9 @@
+@api = http://localhost:8000
+
+### C-07A: Detalle de un libro (Lecturas sin N+1)
+# Resultado esperado: 200. Validar en la consola que no haya un bucle de consultas.
+GET {{api}}/libros/1
+
+### C-07B: Detalle de una venta (Lecturas sin N+1)
+# Resultado esperado: 200. Validar en consola que la carga anticipada funcione.
+GET {{api}}/ventas/1
