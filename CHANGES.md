@@ -217,7 +217,7 @@ CH-03 queda fuera del camino crítico (independiente). CH-04, CH-05, CH-08, CH-0
   - `knowledge-base/09_decisiones_y_supuestos.md` (DD-04, DD-16, SU-04)
 
 ### [CH-02] `migracion-4-seed-y-clases-base`
-- **Estado**: `[ ]` pendiente
+- **Estado**: `[x]` hecho (archivado 04/11/2026 en `openspec/changes/archive/2026-11-04-ch-02-migracion-4-seed-y-clases-base/`)
 - **Objetivo**: disparador de sólo agregado, `seed.py` del parcial y las clases base que usan todos los demás changes.
 - **Entra**:
   - Migración 4 **escrita a mano**: función PL/pgSQL + `CREATE TRIGGER ... BEFORE UPDATE OR DELETE ON movimiento_stock FOR EACH ROW` que levanta excepción (RN-12). `downgrade` quita disparador y función. Comentario de que se escribió a mano porque la comparación automática no ve funciones ni disparadores.

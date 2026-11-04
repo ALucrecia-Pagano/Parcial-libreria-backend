@@ -39,7 +39,19 @@ Pasos para Windows con Git Bash (Python 3.12 o superior y PostgreSQL instalados)
    uvicorn app.main:app --reload --reload-dir app
    ```
 9. Abrí http://localhost:8000/docs
-10. Sobre una base recién creada y migrada, ejecutá `python -m scripts.seed` antes de probar los endpoints. El script no borra datos y rechaza una base con registros. Deja cliente 1 con perfil, libros 1 y 2, y venta 1 (total `71000.00`) para los casos `.http`.
+10. Sobre una base migrada, ejecutá `python seed.py` desde `parcial/` antes de probar los endpoints. El script vacía todas las tablas con `TRUNCATE ... RESTART IDENTITY CASCADE` y carga los datos iniciales, así que se puede correr más de una vez. La venta 1, de Lucía Fernández, totaliza `69000.00` (1 × Rayuela + 2 × Ficciones).
+
+### Datos iniciales (`seed.py`)
+
+Usuarios de prueba, todos activos. La contraseña ficticia común está en la constante `PASSWORD_SEED` de `seed.py`.
+
+| Usuario | Rol | `debe_cambiar_password` |
+|---|---|---|
+| `admin@example.com` | ADMIN | no |
+| `admin2@example.com` | ADMIN | no |
+| `vendedor@example.com` | VENDEDOR | no |
+| `ana@example.com` | CLIENTE | no |
+| `nuevo@example.com` | VENDEDOR | sí |
 
 ## Ejercicio 1 — Proyecto, conexión y ciclo de vida (10 pts)
 
@@ -96,15 +108,15 @@ Pasos para Windows con Git Bash (Python 3.12 o superior y PostgreSQL instalados)
 ## Entrega
 
 - [X] Archivos `TP_Libreria/test/` (en la raíz del proyecto, al nivel de `app/` y `migrations/`) C-01 a C-08 registrados, cada uno con su resultado esperado en comentarios
-- [X] Script de datos iniciales `scripts/seed.py` y pruebas de C-01 a C-08 contra los endpoints
+- [X] Script de datos iniciales `seed.py` en la raíz de `parcial/` y pruebas de C-01 a C-08 contra los endpoints
 - [X] Evidencia C-07 en `docs/evidencia-C-07.txt`: 2 SELECT por detalle de libro y venta, con una o varias relaciones
 - [X] Verificación final: `alembic upgrade head` sobre base vacía, app que levanta, `README` con pasos desde cero
 
 
 ## Verificación y notas de integración
 
-- Los archivos originales `test/C-01.http` a `test/C-08.http` se conservan sin cambios.
+- Los archivos originales `C-01.http` a `C-08.http` del TP siguen solo en `despliegue/test/`; se borraron de `parcial/test/` para que no choquen con los casos C-xx del parcial.
 - Verificado el 14/10/2026: casos C-01 a C-08 originales aprobados en PostgreSQL 16.15, upgrade desde cero, downgrade/upgrade, `alembic check`, seed y arranque/cierre de la API.
-- Para observar C-07: activar `SQL_ECHO=true`, iniciar la API y ejecutar `test/C-07.http`; las consultas se muestran en la consola. La evidencia guardada corresponde a la verificación realizada el 14/10/2026.
+- Para observar las consultas: activar `SQL_ECHO=true` e iniciar la API; se muestran en la consola. La evidencia guardada del caso C-07 del TP corresponde a la verificación realizada el 14/10/2026.
 - Autor recibe `nombre` y `nacionalidad`. Libro recibe `isbn`, `titulo`, `precio`, `stock`, `editorial_id`, `genero_id` opcional y `autores` con `autor_id`, `rol`, `orden`. PATCH conserva lo omitido; si se envía `autores`, reemplaza esa lista atómicamente. Sólo `genero_id` admite null.
 - Se mantienen los modelos, migraciones y servicios de los demás módulos. En Editoriales y Géneros sólo se agregaron los listados de libros; en Ventas se agregó el aviso posterior a la respuesta, sin cambiar el cálculo de Lucas.
