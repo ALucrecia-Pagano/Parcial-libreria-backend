@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Crea el motor y la fábrica en el arranque, cierra el motor al apagar."""
     app.state.engine, app.state.session_factory = init_resources()
     yield
-    await dispose_resources()
+    await dispose_resources(app.state.engine)
 
 
 app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)

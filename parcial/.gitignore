@@ -1,4 +1,4 @@
-# .env (no se versiona): copia .env.example y completa tus valores locales.
+# .env (no se versiona): copia env.example y completa tus valores locales.
 .env
 # Entorno virtual
 .venv/

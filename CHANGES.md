@@ -175,7 +175,7 @@ CH-03 queda fuera del camino crítico (independiente). CH-04, CH-05, CH-08, CH-0
 # PARTE 1 — Base y despliegue (Amanda)
 
 ### [CH-01] `base-config-modelos-migracion-3`
-- **Estado**: `[ ]` pendiente
+- **Estado**: `[x]` hecho (archivado 04/11/2026 en `openspec/changes/archive/2026-11-04-ch-01-base-config-modelos-migracion-3/`)
 - **Objetivo**: dejar el proyecto con configuración sin secretos por defecto, ciclo de vida correcto, salud, todos los modelos nuevos y la migración 3 autogenerada y corregida.
 - **Entra**:
   - `Settings` (pydantic-settings) con `POSTGRES_USER/PASSWORD/DB/HOST/PORT`, `JWT_SECRET`, `JWT_MINUTOS`, `BCRYPT_COSTO`, `COOKIE_SECURE`, `DB_POOL_SIZE`, `SQL_ECHO`; URL de la base con `@computed_field` (driver `postgresql+asyncpg`); **sin default** para `POSTGRES_PASSWORD` ni `JWT_SECRET` (si faltan, la app no arranca). Lee de entorno/`.env` no versionado.
@@ -192,7 +192,9 @@ CH-03 queda fuera del camino crítico (independiente). CH-04, CH-05, CH-08, CH-0
 - **Dependencias**: ninguna.
 - **Archivos**:
   - Crear: `parcial/app/modules/usuarios/__init__.py`, `parcial/app/modules/usuarios/models.py`, `parcial/env.example`, `parcial/migrations/versions/<rev>_acceso_y_movimiento_stock.py`.
-  - Modificar: `parcial/app/core/config.py`, `parcial/app/core/database.py`, `parcial/app/main.py` (lifespan), `parcial/app/modules/health/router.py`, `parcial/app/modules/libros/models.py`, `parcial/app/modules/clientes/models.py`, `parcial/migrations/env.py`, `parcial/alembic.ini`, `parcial/requirements.txt`.
+  - Modificar: `parcial/app/core/config.py`, `parcial/app/core/database.py`, `parcial/app/main.py` (lifespan), `parcial/app/modules/health/router.py`, `parcial/app/modules/libros/models.py`, `parcial/app/modules/clientes/models.py`, `parcial/app/modules/editoriales/models.py` (nombra `uq_editorial_nombre`), `parcial/app/modules/generos/models.py` (nombra `uq_genero_nombre`), `parcial/app/modules/ventas/models.py` (`Venta.movimientos`, navegación en los dos extremos), `parcial/migrations/env.py`, `parcial/alembic.ini`, `parcial/requirements.txt`, `parcial/README.md` (pasos que nombraban `.env.example` / `DATABASE_URL`), `parcial/.gitignore` (comentario que nombraba `.env.example`).
+  - Borrar: `parcial/.env.example` (tenía `DATABASE_URL`, que deja de existir; lo reemplaza `parcial/env.example`).
+  - _Ampliado al proponer (03/11/2026)_: los modelos de editoriales, géneros y ventas, el README, el `.gitignore` y el borrado de `.env.example` se sumaron para que modelo y base queden sincronizados (sin diferencias falsas en `alembic check`) y para declarar toda relación nueva en los dos extremos (lo exige la consigna).
 - **Imitar**: `parcial/app/core/database.py` (`init_resources` / `dispose_resources` ya existen en el TP; se adaptan) y `parcial/app/modules/ventas/models.py` (estilo de relaciones en los dos extremos).
 - **RN**: RN-01 (UNIQUE e índice parcial de ISBN), RN-03 (índice parcial de roles; el 409 lo da CH-12), base de RN-12.
 - **Casos C/D**: ninguno directo (es la base de todos). Verificación propia del Ej. 1 y 2.
@@ -308,6 +310,7 @@ CH-03 queda fuera del camino crítico (independiente). CH-04, CH-05, CH-08, CH-0
 - **Archivos**:
   - Crear: `parcial/app/modules/{editoriales,generos,autores}/repository.py`, `.../unit_of_work.py`, `parcial/test/CH-04_editoriales_generos_autores.http`.
   - Modificar: `.../service.py`, `.../router.py`, `.../schemas.py` de los tres módulos; `parcial/app/core/errores.py` (agrega entradas); `parcial/app/main.py` (solo `include_router` de los dos routers de cada módulo).
+  - **Nota**: `parcial/app/modules/editoriales/models.py` y `parcial/app/modules/generos/models.py` **ya vienen modificados por CH-01** (nombran `uq_editorial_nombre` y `uq_genero_nombre`, que la migración 3 renombra en la base). No volver a tocarlos: partir de lo que dejó CH-01.
 - **Imitar**: `parcial/app/modules/editoriales/service.py` y `router.py` del TP (punto de partida) y, para la forma de las clases base, `parcial/app/core/repository.py` (CH-02).
 - **RN**: RN-01 (nombre de editorial y género), RN-11 (`extra="forbid"` como patrón), RN-15.
 - **Casos C/D**: apoya C-16 (paginación y PATCH parcial) en el catálogo auxiliar.
@@ -691,6 +694,7 @@ CH-03 queda fuera del camino crítico (independiente). CH-04, CH-05, CH-08, CH-0
 - **Archivos**:
   - Crear: `parcial/app/modules/ventas/repository.py`, `parcial/app/modules/ventas/unit_of_work.py`, `parcial/test/C-10_venta_valida.http`, `parcial/test/C-11_venta_sin_stock.http`, `parcial/test/C-12_venta_referencias_invalidas.http`.
   - Modificar: `parcial/app/modules/ventas/{service,router,schemas}.py`, `parcial/app/modules/ventas/tasks.py` (solo si hace falta el logger), `parcial/app/core/errores.py`, `parcial/test/C-06_401_vs_403.http` (agrega "la cliente ve su venta"), `parcial/app/main.py`.
+  - **Nota**: `parcial/app/modules/ventas/models.py` **ya viene modificado por CH-01** (declara `Venta.movimientos` ↔ `MovimientoStock.venta`, navegación en los dos extremos). No volver a tocarlo: partir de lo que dejó CH-01.
 - **Imitar**: `parcial/app/modules/ventas/service.py` y `tasks.py` del TP (lógica actual de la venta) y `parcial/app/modules/libros/stock.py` (CH-06).
 - **RN**: **RN-09**, **RN-10**, **RN-14**, RN-13 (libro de baja no se vende), RN-11 (solo vía `aplicar_movimiento`), RN-15.
 - **Casos C/D**: **C-10**, **C-11**, **C-12**, **C-06** (parte "lo propio").

@@ -2,6 +2,7 @@
 
 from typing import TYPE_CHECKING, Optional
 
+from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
@@ -10,9 +11,10 @@ if TYPE_CHECKING:
 
 class Genero(SQLModel, table=True):
     __tablename__ = "genero"
+    __table_args__ = (UniqueConstraint("nombre", name="uq_genero_nombre"),)
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    nombre: str = Field(unique=True)
+    nombre: str
 
     libros: list["Libro"] = Relationship(back_populates="genero")
 

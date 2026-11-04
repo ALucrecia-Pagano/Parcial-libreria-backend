@@ -1,7 +1,7 @@
 """Entorno de migraciones Alembic (plantilla asincrónica).
 
 El metadata se importa desde los modelos SQLModel y la URL de conexión
-se lee de la variable de entorno DATABASE_URL (nunca de alembic.ini).
+la arma `Settings` (app/core/config.py) a partir de POSTGRES_* (nunca de alembic.ini).
 """
 
 import asyncio
@@ -19,6 +19,7 @@ import app.modules.clientes.models  # noqa: F401
 import app.modules.editoriales.models  # noqa: F401
 import app.modules.generos.models  # noqa: F401
 import app.modules.libros.models  # noqa: F401
+import app.modules.usuarios.models  # noqa: F401
 import app.modules.ventas.models  # noqa: F401
 from app.core.config import settings
 
@@ -27,7 +28,8 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# La URL real siempre viene del entorno, no de alembic.ini.
+# La URL real la arma Settings (computed_field DATABASE_URL), no alembic.ini.
+# set_main_option interpreta "%": si la contraseña lleva "%", escaparla como "%%".
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 target_metadata = SQLModel.metadata

@@ -1,0 +1,13 @@
+@base = http://localhost:8000
+
+### CH-01 / salud: liveness (no toca la base)
+# esperado: 200 {"estado":"vivo"}
+GET {{base}}/health/live
+
+### CH-01 / salud: readiness con PostgreSQL encendido
+# esperado: 200 {"estado":"lista"}
+GET {{base}}/health/ready
+
+### CH-01 / salud: readiness con la base apagada
+# con PostgreSQL detenido -> esperado: 503, mensaje propio, sin texto de la base
+GET {{base}}/health/ready

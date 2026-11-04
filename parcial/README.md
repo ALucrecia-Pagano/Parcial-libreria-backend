@@ -22,9 +22,9 @@ Pasos para Windows con Git Bash (Python 3.12 o superior y PostgreSQL instalados)
    ```bash
    pip install -r requirements.txt
    ```
-5. Copiá el archivo de entorno y completá `DATABASE_URL` con tu contraseña de PostgreSQL. La variable es obligatoria: si falta o está vacía, la aplicación y Alembic muestran un error de configuración. Opcional: agregá `DEBUG=true` para ver las consultas SQL en la consola.
+5. Copiá el archivo de entorno y completá `POSTGRES_PASSWORD` (tu contraseña de PostgreSQL) y `JWT_SECRET` (la clave de firma de los tokens; generala con `python -c "import secrets;print(secrets.token_hex(32))"`). Las dos son obligatorias y no tienen valor por defecto: si falta alguna, la aplicación y Alembic muestran un error de configuración. Opcional: agregá `SQL_ECHO=true` para ver las consultas SQL en la consola.
    ```bash
-   cp .env.example .env
+   cp env.example .env
    ```
 6. Creá la base vacía:
    ```bash
@@ -45,7 +45,7 @@ Pasos para Windows con Git Bash (Python 3.12 o superior y PostgreSQL instalados)
 
 - [X] Estructura modular (`app/core`, `app/modules/<modulo>`, `migrations/`, `test/`)
 - [X] Entorno virtual `.venv` (Python 3.12) y `requirements.txt` con los mínimos (fastapi[standard]>=0.111, sqlmodel>=0.0.24, SQLAlchemy[asyncio]>=2.0, asyncpg>=0.30, alembic>=1.13, python-dotenv>=1.0, uvicorn). El extra `[asyncio]` instala `greenlet`, sin el cual `alembic upgrade head` falla en una instalación limpia
-- [X] `.env.example` con `DATABASE_URL` (+ `.gitignore` cubre `.env` y `.venv`, sin credenciales en el repo)
+- [X] `env.example` con las variables `POSTGRES_*` y `JWT_SECRET` (+ `.gitignore` cubre `.env` y `.venv`, sin credenciales en el repo)
 - [X] Motor asincrónico + `async_sessionmaker(expire_on_commit=False)` + `get_session` (`app/core/`)
 - [X] `lifespan`: recursos en `app.state`, motor cerrado al apagar (`app/main.py`)
 - [X] `GET /health/live` (sin base) y `GET /health/ready` (`SELECT 1`, 503 con mensaje propio)
@@ -62,7 +62,7 @@ Pasos para Windows con Git Bash (Python 3.12 o superior y PostgreSQL instalados)
 
 ## Ejercicio 3 — Migraciones (10 pts)
 
-- [X] Alembic con plantilla asincrónica (URL desde `DATABASE_URL`, sin secretos en `alembic.ini`)
+- [X] Alembic con plantilla asincrónica (URL armada por `Settings` desde `POSTGRES_*`, sin secretos en `alembic.ini`)
 - [X] Migración 1 autogenerada **sin** `genero` ni `libro.genero_id` (correcciones comentadas en el archivo); `upgrade head` / `downgrade -1` / `upgrade head` verificados
 - [X] Migración 2 autogenerada: tabla `genero` + `libro.genero_id` (nullable, índice y FK), con `import sqlmodel` agregado a mano y comentado; `downgrade -1` corregido (nombre explícito `libro_genero_id_fkey`) — ciclo `downgrade`/`upgrade` y `alembic check` ("No new upgrade operations") verificados contra PostgreSQL real
 
@@ -105,6 +105,6 @@ Pasos para Windows con Git Bash (Python 3.12 o superior y PostgreSQL instalados)
 
 - Los archivos originales `test/C-01.http` a `test/C-08.http` se conservan sin cambios.
 - Verificado el 14/10/2026: casos C-01 a C-08 originales aprobados en PostgreSQL 16.15, upgrade desde cero, downgrade/upgrade, `alembic check`, seed y arranque/cierre de la API.
-- Para observar C-07: activar `DEBUG=true`, iniciar la API y ejecutar `test/C-07.http`; las consultas se muestran en la consola. La evidencia guardada corresponde a la verificación realizada el 14/10/2026.
+- Para observar C-07: activar `SQL_ECHO=true`, iniciar la API y ejecutar `test/C-07.http`; las consultas se muestran en la consola. La evidencia guardada corresponde a la verificación realizada el 14/10/2026.
 - Autor recibe `nombre` y `nacionalidad`. Libro recibe `isbn`, `titulo`, `precio`, `stock`, `editorial_id`, `genero_id` opcional y `autores` con `autor_id`, `rol`, `orden`. PATCH conserva lo omitido; si se envía `autores`, reemplaza esa lista atómicamente. Sólo `genero_id` admite null.
 - Se mantienen los modelos, migraciones y servicios de los demás módulos. En Editoriales y Géneros sólo se agregaron los listados de libros; en Ventas se agregó el aviso posterior a la respuesta, sin cambiar el cálculo de Lucas.
