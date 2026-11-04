@@ -8,3 +8,6 @@ __pycache__/
 
 # Configuración del editor
 .idea/
+
+# Skills que generan algunas herramientas a partir de los comandos /opsx:* (duplican las openspec-*)
+.agents/skills/source-command-*/
