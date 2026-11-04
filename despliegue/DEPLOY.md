@@ -2,7 +2,7 @@
 
 - **Grupo**: `<NOMBRE>` (Pagano Amanda, Liendo Mateo, Avila Lucas, Valentini Tiziano, García Juan)
 - **URL pública**: `http://179.199.141.99:8000`
-- **Día y hora del despliegue**: `<FECHA_HORA>`
+- **Día y hora del despliegue**: 04/11/2026, 10:37 (hora de Argentina, UTC-3)
 
 ---
 
@@ -33,10 +33,12 @@ SQL_ECHO=false
 
 ### 3.1. Clonado del repositorio y construcción de la imagen (`docker build`)
 
+La imagen se construye directamente en el VPS: el repositorio es público, así que se clona por HTTPS sin credenciales, y se evita tener que trasladar la imagen desde otra máquina.
+
 Se clona el repositorio por HTTPS en el VPS, se descarga explícitamente la imagen base `python:3.12-alpine` y se construye la imagen desde la carpeta `despliegue/`:
 
 ```bash
-git clone https://github.com/<USUARIO_O_ORG>/<REPO>.git /opt/parcial-libreria
+git clone https://github.com/ALucrecia-Pagano/Parcial-libreria-backend.git /opt/parcial-libreria
 cd /opt/parcial-libreria/despliegue
 docker pull python:3.12-alpine
 docker build -t libreria .

@@ -1,0 +1,14 @@
+CONTAINER ID   IMAGE      COMMAND                  CREATED          STATUS                    PORTS                                         NAMES
+c2dda28f4378   libreria   "sh -c 'alembic upgr…"   40 seconds ago   Up 40 seconds (healthy)   0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp   libreria
+
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO:     Started server process [1]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:59410 - "GET /health/ready HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48460 - "GET /health/ready HTTP/1.1" 200 OK
+
+### GET /ventas/2
+{"id":2,"fecha":"2026-11-04T13:40:46.605680Z","total":"71000.00","cliente":{"id":1,"nombre":"Mateo","email":"mismo_email@example.com"},"renglones":[{"libro_id":1,"titulo":"Rayuela","cantidad":2,"precio_unitario":"25000.00","subtotal":"50000.00"},{"libro_id":2,"titulo":"Los que aman, odian","cantidad":1,"precio_unitario":"21000.00","subtotal":"21000.00"}]}

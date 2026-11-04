@@ -1,0 +1,2 @@
+2026-11-04T13:40:46.633895289Z INFO:     <IP_CLIENTE> - "POST /ventas/ HTTP/1.1" 201 Created
+2026-11-04T13:40:47.134723999Z INFO:     Comprobante de venta 2 enviado a mismo_email@example.com (simulado)

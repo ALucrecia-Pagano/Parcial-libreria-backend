@@ -1,0 +1,5 @@
+FROM python:3.12-alpine
+IMAGE                ID             DISK USAGE   CONTENT SIZE   EXTRA
+python:3.12-alpine   e6dae589c1c0       74.7MB         18.7MB        
+IMAGE             ID             DISK USAGE   CONTENT SIZE   EXTRA
+libreria:latest   61b3b4a5e3ae        255MB         58.7MB        

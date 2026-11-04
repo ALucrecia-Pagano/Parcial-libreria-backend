@@ -7,16 +7,16 @@
 
 | Dato | Valor |
 |---|---|
-| PostgreSQL | Ya corriendo dentro de **EasyPanel** |
+| PostgreSQL | **PostgreSQL 17** ya corriendo dentro de **EasyPanel** (Docker en modo Swarm) |
 | Proyecto / servicio EasyPanel | proyecto `calculadora`, servicio `db` |
 | Host interno | `calculadora_db` |
 | Puerto | `5432` (**NO expuesto** hacia afuera) |
-| Usuario | `calculadora` |
-| Contraseña | **NUNCA en ningún archivo.** Entra sólo por `--env-file` en el servidor (archivo fuera del repo y de la imagen) |
-| Base de la librería | **Nueva**, llamada `libreria`, en ese mismo servidor |
-| Conexión | El contenedor se conecta por la red interna de EasyPanel; el 5432 no se publica |
+| Rol propio | `libreria` (`LOGIN`, contraseña alfanumérica; **no** se usa el usuario `calculadora`) |
+| Contraseña | **NUNCA en ningún archivo.** Entra sólo por `--env-file /root/libreria.env` en el servidor (archivo fuera del repo y de la imagen) |
+| Base de la librería | **Nueva**, llamada `libreria` (`OWNER libreria`), en ese mismo servidor |
+| Conexión | El contenedor se conecta por la red overlay attachable `--network easypanel-calculadora`; el 5432 no se publica |
 
-La consigna dice que la cátedra provee "los datos de acceso y la base" y que, si la dirección es otra que `host.docker.internal`, "se usa esa". Pendientes (P-04 en `10`; la base `libreria` la crea Amanda a mano desde la consola de EasyPanel, resuelto en CH-03): con `docker run` común el contenedor queda en `bridge` y no resuelve `calculadora_db`; hay que unirlo a la red de EasyPanel (`--network ...`). **Puerto público: 8000** (`-p 8000:8000`); si está en uso, **8001**. **Fallback de la base:** si crear `libreria` en el PostgreSQL de la calculadora falla, se crea un Postgres nuevo (otro servicio de EasyPanel) y se documenta en `DEPLOY.md`. Sigue pendiente sólo el nombre de la red de EasyPanel (`--network`); se resuelve durante CH-03 y mientras tanto `DEPLOY.md` lleva `<RED>`.
+La consigna dice que la cátedra provee "los datos de acceso y la base" y que, si la dirección es otra que `host.docker.internal`, "se usa esa". **Resuelto en CH-03 (P-04 / IN-08 / DD-27):** con `docker run` común el contenedor queda en `bridge` y no resuelve `calculadora_db`; se lo une a la red overlay de EasyPanel con `--network easypanel-calculadora` (`Attachable: true`). **Puerto público: 8000** (`-p 8000:8000`, URL `http://179.199.141.99:8000`). **Fallback real de la base (DD-27):** si fallara la conexión al PostgreSQL existente o a la red overlay de Swarm, se levanta un contenedor PostgreSQL propio con `docker run` en una red `bridge` dedicada (`libreria-net`, independiente de Swarm/EasyPanel), tal como queda documentado en `DEPLOY.md`.
 
 ## Ejercicio 9 — La imagen (11 pts)
 
@@ -39,8 +39,8 @@ Trampas documentadas por la consigna:
 ### Forma del comando de ejecución
 
 ```
-docker run -d --name libreria -p <puerto>:8000 --restart unless-stopped \
-   --env-file <archivo-de-variables> libreria
+docker run -d --name libreria --network easypanel-calculadora -p 8000:8000 \
+   --restart unless-stopped --env-file /root/libreria.env libreria
 ```
 - `-p <puerto>:8000`: publica sólo la aplicación, en el puerto que asigna la cátedra.
 - `--restart unless-stopped`: Docker vuelve a levantarlo si termina (reinicio del servidor, base todavía no lista).

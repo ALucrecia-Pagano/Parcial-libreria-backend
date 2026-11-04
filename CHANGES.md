@@ -261,28 +261,28 @@ CH-03 queda fuera del camino crítico (independiente). CH-04, CH-05, CH-08, CH-0
   - `knowledge-base/10_preguntas_abiertas.md` (P-06, resuelta)
 
 ### [CH-03] `despliegue-docker-vps`
-- **Estado**: `[ ]` pendiente
+- **Estado**: `[x]` hecho (archivado 04/11/2026 en `openspec/changes/archive/2026-11-04-ch-03-despliegue-docker-vps/`)
 - **Objetivo**: poner el TP caps. 1–4 (carpeta `despliegue/`, **sin tocar su lógica**) en un contenedor y en el VPS, con la evidencia D-01..D-08.
 - **Entra**:
   - `despliegue/Dockerfile` desde `python:3.12-alpine` (sin compilador; copia e instala `requirements.txt` con `--no-cache-dir` **antes** de copiar el código; usuario sin privilegios con `USER`; sin secretos; arranque `alembic upgrade head` y luego `uvicorn app.main:app --host 0.0.0.0 --port 8000`; `HEALTHCHECK --interval=30s --retries=3 --start-period=20s` sobre `http://127.0.0.1:8000/health/ready` con `wget`, **no** `localhost`).
   - Revisar que `despliegue/.dockerignore` excluya `.env`, `.venv`, `.git`, `__pycache__` (ya existe; solo ajustar si falta algo).
   - `despliegue/env.example` (nuevo; forma de `DATABASE_URL` con `<usuario>:<contraseña>@<host>:5432/<base>` y `SQL_ECHO=false`; el `.env.example` del TP **no se toca**).
   - `despliegue/DEPLOY.md`: URL pública, día y hora, comandos `docker build` y `docker run` completos (nombre del archivo de variables, **sin su contenido**), cambios hechos al TP (ninguno si no hubo), cómo se actualiza (`docker rm -f libreria` + build + run), nota de que el TP lee `DEBUG` y no `SQL_ECHO` (IN-06), y que el TP ya trae `BackgroundTasks` en `ventas/tasks.py` (P-18).
-  - Base `libreria` creada **a mano por Amanda** desde la consola de EasyPanel (servicio `db`, proyecto `calculadora`; host interno `calculadora_db`, 5432 sin exponer). **Fallback (DD-27)**: si eso falla, se crea un Postgres nuevo (otro servicio de EasyPanel) y se documenta en `DEPLOY.md`. Archivo de variables **solo en el servidor** (`--env-file`), fuera del repo y la imagen.
+  - Rol propio `libreria` (`LOGIN`, contraseña alfanumérica) y base `libreria` (`OWNER libreria`; no se usa el usuario `calculadora`) creados **a mano por Amanda** en el PostgreSQL 17 existente de EasyPanel (servicio `db`, proyecto `calculadora`; host interno `calculadora_db`, 5432 sin exponer; red overlay attachable `--network easypanel-calculadora`). **Fallback corregido (DD-27)**: si fallara la conexión al PostgreSQL existente o a la red overlay, se levanta un contenedor Postgres propio con `docker run` en una red `bridge` dedicada (`libreria-net`) y se documenta en `DEPLOY.md`. Archivo de variables **solo en el servidor** (`--env-file /root/libreria.env`), fuera del repo y la imagen.
   - `despliegue/evidencia/` con la salida de **D-01..D-08**. Datos iniciales: `docker exec libreria python -m scripts.seed`.
   - Si el TP no arranca en el contenedor por un defecto propio, se corrige y se anota en `DEPLOY.md` (regla de Ej. 9).
 - **No entra**: cambios de lógica del TP, docker compose, nada de `parcial/`.
 - **Governance**: ALTO (credenciales, servidor; la contraseña de la base **nunca** en un archivo).
 - **Dependencias**: ninguna (independiente; puede arrancar ya).
 - **Archivos**:
-  - Crear: `despliegue/Dockerfile`, `despliegue/env.example`, `despliegue/DEPLOY.md`, `despliegue/evidencia/` (un archivo de texto/captura por caso D).
+  - Crear: `despliegue/Dockerfile`, `despliegue/env.example`, `despliegue/DEPLOY.md`, `despliegue/evidencia/` (un archivo de texto/captura por caso D), `README.md` (raíz, con el link al VPS).
   - Modificar: `despliegue/.dockerignore` (solo si falta una entrada).
 - **Imitar**: `despliegue/.dockerignore` y `despliegue/.env.example` (formato de variables del TP).
 - **RN**: ninguna (requisitos no funcionales: sin secretos, no root).
 - **Casos C/D**: **D-01..D-08**.
 - **.http a correr**: no hay en `test/`; las pruebas D se corren desde afuera del VPS contra la URL pública: `GET /health/ready` → 200; `GET /libros/` → 200 con la lista; `POST /ventas/` (cuerpo de ejemplo del TP) → 201 con precios copiados y total. D-08: el aviso del comprobante aparece en `docker logs libreria` después de la línea de la respuesta.
-- **Resuelto (P-04)**: puerto público **8000** (`-p 8000:8000`); si está en uso, **8001** (anotar cuál en `DEPLOY.md`). Base y fallback: ver arriba.
-- **Pendiente (P-04 / IN-08)**: solo el nombre de la red de EasyPanel (`--network`); se resuelve durante este change y hasta entonces `DEPLOY.md` lleva el placeholder `<RED>`. Nombre del grupo y fecha (P-05, sigue pendiente): `<NOMBRE>` / `<FECHA>`.
+- **Resuelto (P-04 / IN-08 / DD-27)**: URL pública `http://179.199.141.99:8000` (`-p 8000:8000`), red `--network easypanel-calculadora` (`Attachable: true`), rol y base `libreria` en `calculadora_db:5432` (PostgreSQL 17), y fallback con contenedor Postgres propio en red `bridge` (`libreria-net`).
+- **Pendiente (P-05)**: nombre del grupo y fecha: `<NOMBRE>` / `<FECHA>`.
 - **Leer antes (cátedra)** (`docs/catedra/`: buscar la sección puntual, nunca leer el archivo entero):
   - Docker **no tiene capítulo** en el material de cátedra: este change se apoya sólo en la consigna (E9 y E10) y en `knowledge-base/13_despliegue.md`. No buscar en `docs/catedra/`.
 - **Leer antes**:

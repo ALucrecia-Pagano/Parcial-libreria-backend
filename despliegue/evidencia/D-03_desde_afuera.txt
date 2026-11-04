@@ -1,0 +1,29 @@
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+  0      0   0      0   0      0      0      0                              0100     18 100     18   0      0    158      0                              0100     18 100     18   0      0    157      0                              0100     18 100     18   0      0    157      0                              0
+HTTP/1.1 200 OK
+date: Wed, 04 Nov 2026 13:40:14 GMT
+server: uvicorn
+content-length: 18
+content-type: application/json
+
+{"estado":"lista"}
+
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+  0      0   0      0   0      0      0      0                              0100    460 100    460   0      0   2380      0                              0100    460 100    460   0      0   2379      0                              0100    460 100    460   0      0   2378      0                              0
+HTTP/1.1 200 OK
+date: Wed, 04 Nov 2026 13:40:14 GMT
+server: uvicorn
+content-length: 460
+content-type: application/json
+
+[{"id":1,"isbn":"978-950-00-0001-1","titulo":"Rayuela","precio":"25000.00","stock":10,"editorial_id":1,"genero_id":1,"editorial":{"id":1,"nombre":"Editorial de prueba","pais":"Argentina"},"genero":{"id":1,"nombre":"Novela"}},{"id":2,"isbn":"978-950-00-0006-6","titulo":"Los que aman, odian","precio":"21000.00","stock":4,"editorial_id":1,"genero_id":1,"editorial":{"id":1,"nombre":"Editorial de prueba","pais":"Argentina"},"genero":{"id":1,"nombre":"Novela"}}]
+### POST /ventas/ con el cuerpo de C-06
+HTTP/1.1 201 Created
+date: Wed, 04 Nov 2026 13:40:46 GMT
+server: uvicorn
+content-length: 357
+content-type: application/json
+
+{"id":2,"fecha":"2026-11-04T13:40:46.605680Z","total":"71000.00","cliente":{"id":1,"nombre":"Mateo","email":"mismo_email@example.com"},"renglones":[{"libro_id":1,"titulo":"Rayuela","cantidad":2,"precio_unitario":"25000.00","subtotal":"50000.00"},{"libro_id":2,"titulo":"Los que aman, odian","cantidad":1,"precio_unitario":"21000.00","subtotal":"21000.00"}]}

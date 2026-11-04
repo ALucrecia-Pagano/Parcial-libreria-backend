@@ -13,7 +13,7 @@
 | IN-05 | **Resuelta** | `env.example` vs `.env.example` | En `despliegue/` se **agrega** `env.example` y se deja el `.env.example` del TP como está. En `parcial/` se crea `env.example`. |
 | IN-06 | **Resuelta** | `SQL_ECHO` vs `DEBUG` | El TP lee `DEBUG`, no `SQL_ECHO`. En `despliegue/` no se toca nada: se anota en `DEPLOY.md` que `SQL_ECHO=false` del `--env-file` no tiene efecto (inofensivo). En `parcial/`, `Settings` lee `SQL_ECHO`. |
 | IN-07 | **Resuelta** | Fila de requisitos corrupta | Docker >= 20.10; uvicorn viene con `fastapi[standard]`. |
-| IN-08 | **Abierta** (parcial) | Host de la base: consigna vs. VPS | Con `docker run` común el contenedor no resuelve `calculadora_db`; hay que unirlo a la red de EasyPanel. Falta sólo el nombre de la red (se resuelve en CH-03). Ver P-04. |
+| IN-08 | **Resuelta** | Host de la base: consigna vs. VPS | Con `docker run` común el contenedor no resuelve `calculadora_db`; se une a la red overlay attachable de EasyPanel con `--network easypanel-calculadora`. Ver P-04 y DD-27. |
 
 ## Preguntas
 
@@ -22,7 +22,7 @@
 | P-01 | **Resuelta** | `movimiento_stock.usuario_id` nulo; usuario del "Stock inicial" | **NOT NULL.** Los movimientos "Stock inicial" del seed los hace `admin@example.com`. |
 | P-02 | **Resuelta** | Valores de `motivo` | Texto libre: "Stock inicial", "Reposición", "Venta". Sin CHECK. |
 | P-03 | **Resuelta** | Nombres de variables de entorno | `JWT_SECRET`, `JWT_MINUTOS`, `BCRYPT_COSTO`, `COOKIE_SECURE`, `DB_POOL_SIZE`, `POSTGRES_USER/PASSWORD/DB/HOST/PORT` (URL armada con `@computed_field`, driver `postgresql+asyncpg`) y `SQL_ECHO`. **Sin default** para `POSTGRES_PASSWORD` ni `JWT_SECRET`. Ver `08`. |
-| P-04 | **Abierta** (parcial) | Red de EasyPanel y puerto público; creación de la base | **Resuelto:** puerto público **8000**; si está ocupado, **8001**. Base: el PostgreSQL de la calculadora con la base nueva `libreria` (la crea Amanda a mano desde la consola de EasyPanel); **si eso falla, se crea un Postgres nuevo** (fallback documentado en `13` y CH-03). **Pendiente:** nombre de la red de EasyPanel para `--network` (se resuelve durante CH-03). |
+| P-04 | **Resuelta** | Red de EasyPanel y puerto público; creación de la base | **Resuelto en CH-03:** puerto público **8000** (`http://179.199.141.99:8000`); red `--network easypanel-calculadora` (overlay con `Attachable: true`). Base en `calculadora_db:5432` (PostgreSQL 17) con rol propio `libreria` (`LOGIN`, contraseña alfanumérica) y base `libreria` (`OWNER libreria`; no se usa el usuario `calculadora`). **Fallback corregido (DD-27):** contenedor PostgreSQL propio con `docker run` en una red `bridge` dedicada (`libreria-net`), documentado en `13`, `DEPLOY.md` y CH-03. |
 | P-05 | **Abierta** | Nombre del grupo y fecha límite | Usar placeholders `<NOMBRE>` / `<FECHA>` hasta saberlos. |
 | P-06 | **Resuelta** | Precios del seed | Rayuela 25000.00, Antología 30000.00, Respiración artificial 27000.00; Ficciones 22000.00 (de 25000 + 2 x 22000 = 69000.00). **Bestiario 18000.00**, valor ficticio (la consigna no lo da y ningún caso lo usa). Dataset completo del seed (editoriales, géneros, autores, ISBN) ficticio: ver `04` y DD-26. |
 | P-07 | **Resuelta** | `otorgada_por` | FK nullable a `usuario.id`; en el seed es NULL (actor SISTEMA). |
@@ -40,4 +40,4 @@
 
 ## Abiertas hoy
 
-IN-08/P-04 (sólo el nombre de la red de EasyPanel; se resuelve en CH-03), P-05 (nombre del grupo y fecha), P-17 (baja).
+P-05 (nombre del grupo y fecha), P-17 (baja).

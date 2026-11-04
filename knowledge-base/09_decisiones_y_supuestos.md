@@ -40,9 +40,9 @@
 ### DD-10 — Stock con punto único de escritura y movimientos
 **Decisión**: `libro.stock` = suma de movimientos; el stock sólo se toca a través de un único punto (alta, reposición, venta). `PATCH` con `stock` → 422 por `extra="forbid"`.
 
-### DD-11 — Despliegue: base nueva `libreria` en el PostgreSQL existente del VPS
-**Decisión**: reutilizar el PostgreSQL ya corriendo en EasyPanel (proyecto "calculadora", servicio "db", host interno `calculadora_db`, puerto 5432, usuario `calculadora`) y crear en él una base nueva `libreria`. El contenedor se conecta por la red interna de EasyPanel; el 5432 **no** se expone. La contraseña **nunca** se escribe en archivos del repo: entra sólo por `--env-file` en el servidor. Ver `13`.
-**Contexto**: la consigna dice que la cátedra provee la base y la dirección ("Si la cátedra entrega otra dirección, se usa esa"; `host.docker.internal` como ejemplo). **Riesgo**: ver `10` (P-04). **Resuelto parcialmente:** puerto público 8000 (8001 si está ocupado); si crear `libreria` en ese PostgreSQL falla, se crea un Postgres nuevo (DD-27).
+### DD-11 — Despliegue: rol y base nueva `libreria` en el PostgreSQL existente del VPS
+**Decisión**: reutilizar el PostgreSQL 17 ya corriendo en EasyPanel (proyecto "calculadora", servicio "db", host interno `calculadora_db`, puerto 5432) creando en él un rol propio `libreria` (`LOGIN`, contraseña alfanumérica) y una base nueva `libreria` (`OWNER libreria`; no se usa el usuario `calculadora`). El contenedor se conecta por la red overlay attachable `--network easypanel-calculadora`; el 5432 **no** se expone. La contraseña **nunca** se escribe en archivos del repo: entra sólo por `--env-file /root/libreria.env` en el servidor. Ver `13`.
+**Contexto**: la consigna dice que la cátedra provee la base y la dirección ("Si la cátedra entrega otra dirección, se usa esa"; `host.docker.internal` como ejemplo). **Resuelto (P-04 / DD-27):** puerto público 8000 (`http://179.199.141.99:8000`), red `easypanel-calculadora` (attachable) y fallback documentado con un contenedor Postgres propio mediante `docker run` en una red `bridge` dedicada (`libreria-net`).
 
 ### DD-12 — `knowledge-base/` en la raíz del repo
 **Decisión**: nunca dentro de `parcial/` ni `despliegue/`; no se mezcla con `docs/` (fuentes).
@@ -117,8 +117,8 @@ Alcanza para D-08; en el parcial se conserva y se hace visible en consola (logge
 ### DD-26 — Dataset del seed: precios y datos ficticios (P-06)
 Rayuela 25000.00, Antología 30000.00, Ficciones 22000.00, Respiración artificial 27000.00 (del TP); **Bestiario 18000.00, valor ficticio** (la consigna no lo da y ningún caso lo usa; se quitó la marca `PROVISORIO (P-06)`). Venta 1 = 1 Rayuela + 2 Ficciones = 69000.00. Todo lo que el seed necesita y la consigna no fija es **ficticio**: 3 editoriales (Letras del Río, Ediciones del Plata Sur, Editorial Sudamérica Austral), 3 géneros (Novela, Cuento, Antología), 6 autores (Cortázar, Borges, Ocampo, Bioy Casares, Piglia, Saer) e ISBN `978-950-00-0001-1`..`0005-9`. Dataset completo en `04`.
 
-### DD-27 — Despliegue: puerto 8000 y fallback de la base (P-04)
-Puerto público **8000**; si está en uso, **8001**. Base: PostgreSQL de la calculadora con la base nueva `libreria`; **si falla, se crea un Postgres nuevo** y se documenta en `13`, `DEPLOY.md` y CH-03. El nombre de la red de EasyPanel sigue pendiente (se resuelve en CH-03).
+### DD-27 — Despliegue: puerto 8000, red `easypanel-calculadora` y fallback real en red bridge propia (P-04)
+Puerto público **8000** (`http://179.199.141.99:8000`). Red de EasyPanel usada: `--network easypanel-calculadora` (overlay con `Attachable: true`). Base: PostgreSQL 17 de la calculadora (`calculadora_db:5432`) con rol propio `libreria` (`LOGIN`, contraseña alfanumérica) y base `libreria` (`OWNER libreria`; no se usa el usuario `calculadora`). **Fallback corregido**: si fallara la conexión al PostgreSQL existente o a la red overlay de Swarm, el fallback real es levantar un contenedor PostgreSQL propio con `docker run` en una red `bridge` dedicada (`libreria-net`), y no crear otro servicio de EasyPanel (que quedaría igualmente en una red overlay de Swarm). Documentado en `13`, `DEPLOY.md` y CH-03.
 
 ### DD-28 — Material de cátedra en `docs/catedra/` (P-13)
 Cap1 a cap6 en Markdown; las «secciones X.Y» de la consigna refieren a esos archivos. Regla: Grep del encabezado y leer la sección puntual, **nunca el archivo entero**.
