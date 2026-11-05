@@ -4,7 +4,6 @@ Cada función recibe el Unit of Work y lo abre con `async with uow:`. Un
 IntegrityError sale del bloque, el Unit of Work revierte y el router lo traduce.
 """
 from fastapi import HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.paginacion import Pagina, construir_pagina, validar_pagina
 from app.modules.autores.models import Autor
@@ -44,11 +43,3 @@ async def _buscar(uow: AutoresUnitOfWork, autor_id: int) -> Autor:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=MENSAJE_NO_ENCONTRADO)
     return autor
 
-
-async def get_autor(session: AsyncSession, autor_id: int) -> Autor:
-    """Puente temporal: lo usa libros/service.py (list_libros_autor) hasta que CH-05
-    pase libros a repositorio + UoW. Solo lee; no confirma nada. Borrar en CH-05."""
-    autor = await session.get(Autor, autor_id)
-    if autor is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=MENSAJE_NO_ENCONTRADO)
-    return autor

@@ -7,10 +7,11 @@ Dos routers por convención del parcial:
 - router_abierto: lecturas, no piden sesión (el catálogo es público).
 - router_admin: escrituras; la guarda requiere_rol("ADMIN") llega con CH-10.
 No hay DELETE: el catálogo auxiliar no se borra (decisión del grupo, CH-04).
+GET /editoriales/{id}/libros vive en libros/router.py (CH-05).
 """
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.exc import IntegrityError
 
 from app.core.database import SessionDep
@@ -19,8 +20,6 @@ from app.core.paginacion import Pagina, PaginacionDep
 from app.modules.editoriales import service
 from app.modules.editoriales.schemas import EditorialCreate, EditorialRead, EditorialUpdate
 from app.modules.editoriales.unit_of_work import EditorialesUnitOfWork
-from app.modules.libros.schemas import LibroRead
-from app.modules.libros.service import list_libros
 
 
 def get_uow(session: SessionDep) -> EditorialesUnitOfWork:
@@ -41,19 +40,6 @@ async def listar(uow: UowDep, paginacion: PaginacionDep):
 @router_abierto.get("/{editorial_id}", response_model=EditorialRead)
 async def obtener(editorial_id: int, uow: UowDep):
     return await service.obtener(uow, editorial_id)
-
-
-# Pendiente de CH-05 (fuera del alcance de CH-04): solo se adaptó para seguir
-# andando con el Unit of Work; CH-05 la reescribe con el repositorio de libros.
-@router_abierto.get("/{editorial_id}/libros", response_model=list[LibroRead])
-async def libros_de_la_editorial(
-    editorial_id: int,
-    uow: UowDep,
-    limit: int = Query(20, ge=1, le=100),
-    offset: int = Query(0, ge=0),
-):
-    await service.obtener(uow, editorial_id)
-    return await list_libros(uow.session, limit, offset, editorial_id=editorial_id)
 
 
 @router_admin.post("", response_model=EditorialRead, status_code=status.HTTP_201_CREATED)

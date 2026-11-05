@@ -1,0 +1,142 @@
+# C-16 · Búsqueda segura, paginación con filtro, PATCH parcial y PATCH del stock
+# (más las lecturas de catálogo y la baja lógica de CH-05)
+# Antes de correr este archivo: python seed.py
+# Correr los pedidos EN ORDEN: la sección 4 da de baja Ficciones (libro 3).
+#
+# Libros del seed: 1 Rayuela (editorial 1, género 1) · 2 Antología de la literatura
+# fantástica (ed. 2, gén. 3) · 3 Ficciones (ed. 3, gén. 2) · 4 Respiración artificial
+# (ed. 2, gén. 1) · 5 Bestiario (ed. 3, gén. 2). Borges (autor 2) escribe el 2 y el 3.
+#
+# Nota: las guardas de rol (ADMIN para PATCH y DELETE) llegan con CH-10.
+
+@base = http://localhost:8000
+
+############################################################
+# 1. Búsqueda por título con parámetros ligados
+############################################################
+
+### 1.1 Inyección SQL en el título: ' OR '1'='1
+# esperado: 200 {"items":[], "total":0, "page":1, "size":20, "pages":1}
+GET {{base}}/libros?titulo=%27%20OR%20%271%27%3D%271
+
+### 1.2 Búsqueda sin distinguir mayúsculas, con tamaño 1
+# esperado: 200 {"items":[Ficciones], "total":1, "page":1, "size":1, "pages":1}
+GET {{base}}/libros?titulo=FICC&size=1
+
+### 1.3 La misma búsqueda, página 2
+# esperado: 422 {"detail":"La página 2 no existe: hay 1"}
+GET {{base}}/libros?titulo=ficc&size=1&page=2
+
+### 1.4 Tamaño fuera de rango
+# esperado: 422
+GET {{base}}/libros?size=500
+
+### 1.5 Filtro por género (total con el mismo filtro que la página)
+# esperado: 200 {"items":[Ficciones, Bestiario], "total":2, "page":1, "size":20, "pages":1}
+GET {{base}}/libros?genero_id=2
+
+############################################################
+# 2. Detalle
+############################################################
+
+### 2.1 Id que no es entero
+# esperado: 422
+GET {{base}}/libros/abc
+
+### 2.2 Detalle de un libro vigente
+# esperado: 200 Rayuela con editorial, género y autores (Julio Cortázar)
+GET {{base}}/libros/1
+
+############################################################
+# 3. PATCH: solo título y precio, el stock no (RN-11)
+############################################################
+
+### 3.1 Un solo campo
+# esperado: 200 titulo "Rayuela (edición aniversario)", precio sigue "25000.00", stock sigue 10
+PATCH {{base}}/libros/1
+Content-Type: application/json
+
+{ "titulo": "Rayuela (edición aniversario)" }
+
+### 3.2 Intento de editar el stock
+# esperado: 422 (extra_forbidden: el stock no se edita por PATCH)
+PATCH {{base}}/libros/1
+Content-Type: application/json
+
+{ "stock": 99 }
+
+### 3.3 Intento de editar el ISBN
+# esperado: 422 (el PATCH solo admite titulo y precio)
+PATCH {{base}}/libros/1
+Content-Type: application/json
+
+{ "isbn": "978-950-00-9999-9" }
+
+### 3.4 Precio no positivo
+# esperado: 422
+PATCH {{base}}/libros/1
+Content-Type: application/json
+
+{ "precio": "0" }
+
+### 3.5 Libro que no existe
+# esperado: 404 {"detail":"Libro no encontrado"}
+PATCH {{base}}/libros/9999
+Content-Type: application/json
+
+{ "precio": "1000.00" }
+
+############################################################
+# 4. Baja lógica (RN-13)
+############################################################
+
+### 4.1 Dar de baja Ficciones (tiene ventas: la fila se conserva)
+# esperado: 204 sin cuerpo
+DELETE {{base}}/libros/3
+
+### 4.2 El libro dado de baja ya no se ve en el detalle
+# esperado: 404 {"detail":"Libro no encontrado"}
+GET {{base}}/libros/3
+
+### 4.3 Ni en el catálogo
+# esperado: 200 total 4, sin Ficciones
+GET {{base}}/libros
+
+### 4.4 La venta vieja lo sigue mostrando
+# esperado: 200 renglones con "titulo":"Ficciones" (y Rayuela)
+GET {{base}}/ventas/1
+
+### 4.5 Darlo de baja otra vez
+# esperado: 404
+DELETE {{base}}/libros/3
+
+### 4.6 Editar un libro dado de baja
+# esperado: 404
+PATCH {{base}}/libros/3
+Content-Type: application/json
+
+{ "precio": "1000.00" }
+
+############################################################
+# 5. Libros de una editorial, un género o un autor (solo vigentes)
+############################################################
+
+### 5.1 Libros de la editorial 1
+# esperado: 200 [Rayuela]
+GET {{base}}/editoriales/1/libros
+
+### 5.2 Libros del género 2 (Ficciones está de baja)
+# esperado: 200 [Bestiario]
+GET {{base}}/generos/2/libros
+
+### 5.3 Género que no existe
+# esperado: 404 {"detail":"Género no encontrado"}
+GET {{base}}/generos/9999/libros
+
+### 5.4 Libros de Borges (Ficciones está de baja)
+# esperado: 200 [Antología de la literatura fantástica]
+GET {{base}}/autores/2/libros
+
+### 5.5 Autor que no existe
+# esperado: 404 {"detail":"Autor no encontrado"}
+GET {{base}}/autores/9999/libros

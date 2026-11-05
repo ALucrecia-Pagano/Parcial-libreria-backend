@@ -15,7 +15,9 @@ from app.modules.editoriales.router import router_admin as editoriales_admin
 from app.modules.generos.router import router_abierto as generos_abierto
 from app.modules.generos.router import router_admin as generos_admin
 from app.modules.health.router import router as health_router
-from app.modules.libros.router import router as libros_router
+from app.modules.libros.router import router_abierto as libros_abierto
+from app.modules.libros.router import router_admin as libros_admin
+from app.modules.libros.router import router_por_entidad as libros_por_entidad
 from app.modules.ventas.router import router as ventas_router
 
 @asynccontextmanager
@@ -35,7 +37,9 @@ app.include_router(generos_abierto)
 app.include_router(generos_admin)
 app.include_router(autores_abierto)
 app.include_router(autores_admin)
-app.include_router(libros_router)
+app.include_router(libros_abierto)
+app.include_router(libros_por_entidad)
+app.include_router(libros_admin)
 app.include_router(clientes_router)
 app.include_router(ventas_router)
 
