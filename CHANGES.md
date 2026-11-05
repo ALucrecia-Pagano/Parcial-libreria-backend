@@ -420,7 +420,7 @@ CH-03 queda fuera del camino crítico (independiente). CH-04, CH-05, CH-08, CH-0
 # PARTE 3 — Autenticación (Persona 3)
 
 ### [CH-07] `security-login-cookie`
-- **Estado**: `[ ]` pendiente
+- **Estado**: `[x]` hecho (archivado 05/11/2026 en `openspec/changes/archive/2026-11-05-ch-07-security-login-cookie/`)
 - **Objetivo**: bcrypt fuera del bucle, JWT y login con cookie, anti-enumeración con hash ficticio.
 - **Entra**:
   - `app/core/security.py`: `hashear_password` / `verificar_password` con `asyncio.to_thread` y **semáforo** (limita cuántos bcrypt corren a la vez), costo = `BCRYPT_COSTO`; `crear_token(sub, roles)` y `decodificar_token` con PyJWT (claims `sub`, `exp`, roles vigentes al emitir; firmado con `JWT_SECRET`, duración `JWT_MINUTOS`).
