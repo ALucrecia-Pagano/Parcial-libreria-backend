@@ -1,9 +1,11 @@
-"""Lógica de negocio del módulo usuarios y autenticación (CH-07)."""
+"""Lógica de negocio del módulo usuarios y autenticación (CH-07 y CH-09)."""
 
 from fastapi import HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import settings
 from app.core.security import crear_token, verificar_password
+from app.modules.usuarios.repository import registrar_intento
 from app.modules.usuarios.schemas import LoginIn, LoginOut
 from app.modules.usuarios.unit_of_work import UsuariosUnitOfWork
 
@@ -14,42 +16,58 @@ class UsuariosService:
         uow: UsuariosUnitOfWork,
         datos: LoginIn,
         hash_ficticio: str,
+        ip: str,
+        session_factory: async_sessionmaker[AsyncSession],
     ) -> tuple[str, LoginOut]:
-        """Autentica al usuario, mitiga enumeración con hash ficticio y emite token JWT."""
-        # Punto de inserción para CH-09: límite de intentos fallidos antes de bcrypt.
+        """Autentica al usuario aplicando limitación de tasa (429) y auditoría en intento_acceso."""
+        # 1. Límite de intentos: evaluar antes de tocar bcrypt (RN-07).
+        # Cuenta los fallos en los últimos 60s desde el último éxito.
+        bloqueado, retry_after = await uow.intentos.verificar_limite_intentos(
+            datos.email, ip
+        )
+        if bloqueado:
+            # El intento rechazado por 429 NO se registra (P-14) y responde sin consumir CPU.
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Demasiados intentos fallidos. Intente más tarde.",
+                headers={"Retry-After": str(retry_after)},
+            )
 
-        # 1. Búsqueda del usuario en su propio bloque UoW.
-        # Al salir del bloque async with, la transacción de lectura finaliza y la conexión
-        # se libera al pool antes de ejecutar bcrypt.
+        # 2. Búsqueda del usuario en su propio bloque UoW.
+        # Libera la conexión al pool antes de ejecutar bcrypt.
         async with uow:
             usuario = await uow.usuarios.get_by_email(datos.email)
 
-        # 2. Anti-enumeración: si no existe, verificar contra hash ficticio (mismo tiempo).
-        # Esta verificación corre sin ninguna conexión retenida en el pool.
+        # 3. Anti-enumeración: usuario inexistente
         if usuario is None:
+            await registrar_intento(session_factory, datos.email, ip, exito=False)
             await verificar_password(datos.password, hash_ficticio)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Credenciales inválidas",
             )
 
-        # 3. Verificación de hash con bcrypt fuera de la transacción para no retener el pool
+        # 4. Verificación de hash con bcrypt fuera de transacción
         password_valida = await verificar_password(
             datos.password, usuario.password_hash
         )
 
-        # 4. Usuario inactivo o contraseña errónea devuelven el mismo 401 unificado
+        # 5. Usuario inactivo o contraseña errónea devuelven el mismo 401 unificado
         if not password_valida or not usuario.activo:
+            await registrar_intento(session_factory, datos.email, ip, exito=False)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Credenciales inválidas",
             )
 
-        # 5. Obtener roles vigentes en un segundo bloque UoW
+        # 6. Autenticación exitosa: registrar éxito en sesión propia (reinicia la ventana)
+        await registrar_intento(session_factory, datos.email, ip, exito=True)
+
+        # 7. Obtener roles vigentes en un segundo bloque UoW
         async with uow:
             roles = await uow.asignaciones.roles_vigentes(usuario.id)
 
-        # 6. Emitir JWT con roles vigentes al momento del login
+        # 8. Emitir JWT con roles vigentes
         token = crear_token(sub=str(usuario.id), roles=roles)
 
         respuesta = LoginOut(

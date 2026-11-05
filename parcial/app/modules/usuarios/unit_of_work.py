@@ -6,6 +6,7 @@ from app.core.unit_of_work import UnitOfWork
 from app.modules.usuarios.repository import (
     AsignacionRolRepository,
     EventoSeguridadRepository,
+    IntentoAccesoRepository,
     UsuarioRepository,
 )
 
@@ -16,3 +17,4 @@ class UsuariosUnitOfWork(UnitOfWork):
         self.usuarios = UsuarioRepository(session)
         self.asignaciones = AsignacionRolRepository(session)
         self.eventos = EventoSeguridadRepository(session)
+        self.intentos = IntentoAccesoRepository(session)

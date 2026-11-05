@@ -1,4 +1,4 @@
-"""Rutas de autenticación y usuarios (CH-07)."""
+"""Rutas de autenticación y usuarios (CH-07 y CH-09)."""
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
 
@@ -19,7 +19,7 @@ async def login(
     response: Response,
     session: SessionDep,
 ) -> LoginOut:
-    """Inicia sesión validando credenciales y emitiendo cookie HttpOnly."""
+    """Inicia sesión validando credenciales, límite de intentos y emitiendo cookie HttpOnly."""
     hash_ficticio = getattr(request.app.state, "hash_ficticio", None)
     if not hash_ficticio:
         raise HTTPException(
@@ -27,8 +27,19 @@ async def login(
             detail="Error de configuración interna del servidor: hash ficticio no inicializado",
         )
 
+    session_factory = getattr(request.app.state, "session_factory", None)
+    if not session_factory:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error de configuración interna del servidor: fábrica de sesiones no inicializada",
+        )
+
+    client_ip = request.client.host if request.client else "127.0.0.1"
     uow = UsuariosUnitOfWork(session)
-    token, resultado = await service.login(uow, datos, hash_ficticio)
+
+    token, resultado = await service.login(
+        uow, datos, hash_ficticio, client_ip, session_factory
+    )
 
     response.set_cookie(
         key="access_token",

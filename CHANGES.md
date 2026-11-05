@@ -495,7 +495,7 @@ CH-03 queda fuera del camino crítico (independiente). CH-04, CH-05, CH-08, CH-0
   - `knowledge-base/09_decisiones_y_supuestos.md` (DD-08, DD-18)
 
 ### [CH-09] `intento-acceso-limite-429`
-- **Estado**: `[ ]` pendiente
+- **Estado**: [x] hecho (archivado 05/11/2026 en openspec/changes/archive/2026-11-05-ch-09-intento-acceso-limite-429/)
 - **Objetivo**: anotar cada intento de login en sesión propia y limitar a 5 fallos por minuto (RN-07).
 - **Entra**:
   - `IntentoAccesoRepository` y una función `registrar_intento(session_factory, email, ip, exito)` que abre **su propia sesión y transacción** y **siempre confirma** (la fábrica sale de `app.state`). Es la **única** escritura que no comparte la transacción de la petición. Va con **un comentario que dice tres cosas**: (1) qué hace distinto, (2) por qué no puede compartir la transacción (el fallo que se cuenta es el mismo que la revierte), (3) su costo (deja filas aunque la petición falle).
