@@ -1,0 +1,149 @@
+# CH-04 · Editoriales, géneros y autores a repositorio + Unit of Work
+# Antes de correr este archivo: python seed.py (deja 3 editoriales, 3 géneros y 6 autores).
+# Correr los pedidos EN ORDEN: algunos dependen de los anteriores (los 201 crean filas).
+#
+# Nota: las guardas de rol (ADMIN para POST y PATCH) llegan con CH-10. Cuando estén en
+# main, este archivo suma el login de admin@example.com y la cookie en los POST/PATCH.
+
+@base = http://localhost:8000
+
+############################################################
+# 1. Listados con envoltorio {items, total, page, size, pages}
+############################################################
+
+### 1.1 Editoriales paginadas
+# esperado: 200 {"items":[{id 1},{id 2}], "total":3, "page":1, "size":2, "pages":2}
+GET {{base}}/editoriales?size=2
+
+### 1.2 Página que no existe
+# esperado: 422 {"detail":"La página 99 no existe: hay 1"}
+GET {{base}}/editoriales?page=99
+
+### 1.3 Tamaño fuera de rango (1..100)
+# esperado: 422 (size debe ser <= 100)
+GET {{base}}/editoriales?size=500
+
+### 1.4 Géneros con el envoltorio y valores por defecto
+# esperado: 200 {"items":[Novela, Cuento, Antología], "total":3, "page":1, "size":20, "pages":1}
+GET {{base}}/generos
+
+############################################################
+# 2. Altas: 201, nombre repetido 409 (RN-01) y campo extra 422
+############################################################
+
+### 2.1 Género con nombre repetido
+# esperado: 409 {"detail":"Ya existe un género con ese nombre"} (sin texto de la base)
+POST {{base}}/generos
+Content-Type: application/json
+
+{ "nombre": "Novela" }
+
+### 2.2 Género nuevo
+# esperado: 201 {"id":5, "nombre":"Ensayo"}
+# (id 5 y no 4: el INSERT rechazado en 2.1 igual consumió el 4 de la secuencia)
+POST {{base}}/generos
+Content-Type: application/json
+
+{ "nombre": "Ensayo" }
+
+### 2.3 Género con un campo que el contrato no declara
+# esperado: 422 (extra="forbid": "Extra inputs are not permitted")
+POST {{base}}/generos
+Content-Type: application/json
+
+{ "nombre": "Poesía", "descripcion": "no existe en el contrato" }
+
+### 2.4 Editorial con nombre repetido
+# esperado: 409 {"detail":"Ya existe una editorial con ese nombre"}
+POST {{base}}/editoriales
+Content-Type: application/json
+
+{ "nombre": "Letras del Río", "pais": "Argentina" }
+
+### 2.5 Editorial nueva
+# esperado: 201 {"id":5, "nombre":"Ediciones Cuyo", "pais":"Argentina"}
+# (id 5: el INSERT rechazado en 2.4 consumió el 4)
+POST {{base}}/editoriales
+Content-Type: application/json
+
+{ "nombre": "Ediciones Cuyo", "pais": "Argentina" }
+
+### 2.6 Autor sin nombre
+# esperado: 422 (nombre es obligatorio)
+POST {{base}}/autores
+Content-Type: application/json
+
+{ "nacionalidad": "Argentina" }
+
+### 2.7 Autor nuevo
+# esperado: 201 {"id":7, "nombre":"Antonio Di Benedetto", "nacionalidad":"Argentina"}
+# (acá sí 7: el 422 de 2.6 lo frena el contrato, nunca llega a la base)
+POST {{base}}/autores
+Content-Type: application/json
+
+{ "nombre": "Antonio Di Benedetto", "nacionalidad": "Argentina" }
+
+############################################################
+# 3. PATCH parcial (exclude_unset): solo cambia lo enviado
+############################################################
+
+### 3.1 Editorial: un solo campo
+# esperado: 200 {"id":1, "nombre":"Letras del Río", "pais":"Uruguay"} (el nombre NO cambia)
+PATCH {{base}}/editoriales/1
+Content-Type: application/json
+
+{ "pais": "Uruguay" }
+
+### 3.2 Editorial: campo extra
+# esperado: 422 (extra="forbid")
+PATCH {{base}}/editoriales/1
+Content-Type: application/json
+
+{ "pais": "Chile", "stock": 5 }
+
+### 3.3 Editorial que no existe
+# esperado: 404 {"detail":"Editorial no encontrada"}
+PATCH {{base}}/editoriales/9999
+Content-Type: application/json
+
+{ "pais": "Chile" }
+
+### 3.4 Editorial: renombrar a un nombre que ya existe
+# esperado: 409 {"detail":"Ya existe una editorial con ese nombre"}
+PATCH {{base}}/editoriales/2
+Content-Type: application/json
+
+{ "nombre": "Letras del Río" }
+
+### 3.5 Autor: un solo campo
+# esperado: 200 {"id":6, "nombre":"Juan José Saer", "nacionalidad":"Argentino-francesa"}
+PATCH {{base}}/autores/6
+Content-Type: application/json
+
+{ "nacionalidad": "Argentino-francesa" }
+
+### 3.6 Autor que no existe
+# esperado: 404 {"detail":"Autor no encontrado"}
+PATCH {{base}}/autores/9999
+Content-Type: application/json
+
+{ "nacionalidad": "Chilena" }
+
+############################################################
+# 4. Rutas que NO existen en el parcial
+############################################################
+
+### 4.1 PATCH de géneros (la consigna no lo tiene)
+# esperado: 405 Method Not Allowed
+PATCH {{base}}/generos/1
+Content-Type: application/json
+
+{ "nombre": "Novela larga" }
+
+### 4.2 DELETE de editoriales (decisión del grupo: el catálogo auxiliar no se borra)
+# esperado: 405 Method Not Allowed
+DELETE {{base}}/editoriales/3
+
+### 4.3 Parámetro de ruta que no es entero
+# esperado: 422
+GET {{base}}/editoriales/abc

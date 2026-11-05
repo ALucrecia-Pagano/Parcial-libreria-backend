@@ -7,10 +7,13 @@ from fastapi import FastAPI
 
 from app.core.config import settings
 from app.core.database import dispose_resources, init_resources
-from app.modules.autores.router import router as autores_router
+from app.modules.autores.router import router_abierto as autores_abierto
+from app.modules.autores.router import router_admin as autores_admin
 from app.modules.clientes.router import router as clientes_router
-from app.modules.editoriales.router import router as editoriales_router
-from app.modules.generos.router import router as generos_router
+from app.modules.editoriales.router import router_abierto as editoriales_abierto
+from app.modules.editoriales.router import router_admin as editoriales_admin
+from app.modules.generos.router import router_abierto as generos_abierto
+from app.modules.generos.router import router_admin as generos_admin
 from app.modules.health.router import router as health_router
 from app.modules.libros.router import router as libros_router
 from app.modules.ventas.router import router as ventas_router
@@ -26,9 +29,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
 
 app.include_router(health_router)
-app.include_router(editoriales_router)
-app.include_router(generos_router)
-app.include_router(autores_router)
+app.include_router(editoriales_abierto)
+app.include_router(editoriales_admin)
+app.include_router(generos_abierto)
+app.include_router(generos_admin)
+app.include_router(autores_abierto)
+app.include_router(autores_admin)
 app.include_router(libros_router)
 app.include_router(clientes_router)
 app.include_router(ventas_router)

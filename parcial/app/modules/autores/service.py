@@ -1,52 +1,54 @@
-"""CRUD de autores y traducción de errores de integridad."""
-from fastapi import HTTPException
-from sqlalchemy import delete
-from sqlalchemy.exc import IntegrityError
+"""Reglas del módulo autores.
+
+Cada función recibe el Unit of Work y lo abre con `async with uow:`. Un
+IntegrityError sale del bloque, el Unit of Work revierte y el router lo traduce.
+"""
+from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
+
+from app.core.paginacion import Pagina, construir_pagina, validar_pagina
 from app.modules.autores.models import Autor
-from app.modules.autores.schemas import AutorCreate, AutorUpdate
+from app.modules.autores.schemas import AutorCreate, AutorRead, AutorUpdate
+from app.modules.autores.unit_of_work import AutoresUnitOfWork
+
+MENSAJE_NO_ENCONTRADO = "Autor no encontrado"
 
 
-async def list_autores(session: AsyncSession, limit: int = 20, offset: int = 0):
-    result = await session.execute(select(Autor).order_by(Autor.id).limit(limit).offset(offset))
-    return result.scalars().all()
+async def listar(uow: AutoresUnitOfWork, page: int, size: int) -> Pagina[AutorRead]:
+    async with uow:
+        total = await uow.autores.count()
+        validar_pagina(total, page, size)
+        items = await uow.autores.get_all(offset=(page - 1) * size, limit=size)
+        return construir_pagina([AutorRead.model_validate(a) for a in items], total, page, size)
+
+
+async def obtener(uow: AutoresUnitOfWork, autor_id: int) -> Autor:
+    async with uow:
+        return await _buscar(uow, autor_id)
+
+
+async def crear(uow: AutoresUnitOfWork, datos: AutorCreate) -> Autor:
+    async with uow:
+        return await uow.autores.add(Autor.model_validate(datos))
+
+
+async def actualizar(uow: AutoresUnitOfWork, autor_id: int, datos: AutorUpdate) -> Autor:
+    async with uow:
+        autor = await _buscar(uow, autor_id)
+        return await uow.autores.update(autor, datos.model_dump(exclude_unset=True))
+
+
+async def _buscar(uow: AutoresUnitOfWork, autor_id: int) -> Autor:
+    autor = await uow.autores.get_by_id(autor_id)
+    if autor is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=MENSAJE_NO_ENCONTRADO)
+    return autor
 
 
 async def get_autor(session: AsyncSession, autor_id: int) -> Autor:
+    """Puente temporal: lo usa libros/service.py (list_libros_autor) hasta que CH-05
+    pase libros a repositorio + UoW. Solo lee; no confirma nada. Borrar en CH-05."""
     autor = await session.get(Autor, autor_id)
     if autor is None:
-        raise HTTPException(404, "Autor no encontrado")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=MENSAJE_NO_ENCONTRADO)
     return autor
-
-
-async def create_autor(session: AsyncSession, data: AutorCreate) -> Autor:
-    autor = Autor.model_validate(data)
-    session.add(autor)
-    await _guardar(session)
-    return autor
-
-
-async def update_autor(session: AsyncSession, autor: Autor, data: AutorUpdate) -> Autor:
-    for campo, valor in data.model_dump(exclude_unset=True).items():
-        setattr(autor, campo, valor)
-    await _guardar(session)
-    return autor
-
-
-async def delete_autor(session: AsyncSession, autor: Autor) -> None:
-    # DELETE directo: la FK rechaza autores utilizados sin intentar anular su PK.
-    try:
-        await session.execute(delete(Autor).where(Autor.id == autor.id))
-        await session.commit()
-    except IntegrityError:
-        await session.rollback()
-        raise HTTPException(409, "No se puede borrar un autor con libros asociados") from None
-
-
-async def _guardar(session: AsyncSession) -> None:
-    try:
-        await session.commit()
-    except IntegrityError:
-        await session.rollback()
-        raise HTTPException(409, "No se pudo guardar el autor: datos en conflicto") from None

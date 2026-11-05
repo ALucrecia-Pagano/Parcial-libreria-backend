@@ -296,7 +296,7 @@ CH-03 queda fuera del camino crítico (independiente). CH-04, CH-05, CH-08, CH-0
 # PARTE 2 — Catálogo y stock (Persona 2)
 
 ### [CH-04] `catalogo-auxiliar-repo-uow`
-- **Estado**: `[ ]` pendiente
+- **Estado**: `[x]` hecho (archivado 05/11/2026 en `openspec/changes/archive/2026-11-05-ch-04-catalogo-auxiliar-repo-uow/`)
 - **Objetivo**: llevar editoriales, géneros y autores a capas repositorio + Unit of Work, con envoltorio de listado y contratos estrictos.
 - **Entra**:
   - Por cada módulo (`editoriales`, `generos`, `autores`): `repository.py` (hereda de `BaseRepository`), `unit_of_work.py`, `service.py` que **recibe** el UoW y lo abre con `async with`, `router.py` que arma el UoW con una dependencia y se lo pasa al servicio.

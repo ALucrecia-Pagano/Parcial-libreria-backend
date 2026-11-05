@@ -1,20 +1,18 @@
-"""DTOs del módulo generos: entrada (Create, Update) y salida (Read)."""
+"""Contratos del módulo géneros: entrada (Create) y salida (Read).
 
-from typing import Optional
-
+No hay GeneroUpdate: el parcial no tiene PATCH /generos (CH-04).
+El de entrada rechaza los campos que no declara (extra="forbid").
+"""
+from pydantic import ConfigDict
 from sqlmodel import Field, SQLModel
 
 
 class GeneroCreate(SQLModel):
     """Entrada del alta: no lleva id, lo genera la base."""
 
+    model_config = ConfigDict(extra="forbid")
+
     nombre: str = Field(min_length=1, max_length=80)
-
-
-class GeneroUpdate(SQLModel):
-    """Entrada del PATCH: todo opcional, se aplica solo lo enviado."""
-
-    nombre: Optional[str] = Field(default=None, min_length=1, max_length=80)
 
 
 class GeneroRead(SQLModel):
