@@ -1,0 +1,90 @@
+@base = http://localhost:8000
+
+### C-05: Intento 1 fallido
+# esperado: 401 {"detail":"Credenciales inválidas"}
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "vendedor@example.com",
+  "password": "PasswordIncorrecta1!"
+}
+
+### C-05: Intento 2 fallido
+# esperado: 401 {"detail":"Credenciales inválidas"}
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "vendedor@example.com",
+  "password": "PasswordIncorrecta2!"
+}
+
+### C-05: Intento 3 fallido
+# esperado: 401 {"detail":"Credenciales inválidas"}
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "vendedor@example.com",
+  "password": "PasswordIncorrecta3!"
+}
+
+### C-05: Intento 4 fallido
+# esperado: 401 {"detail":"Credenciales inválidas"}
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "vendedor@example.com",
+  "password": "PasswordIncorrecta4!"
+}
+
+### C-05: Intento 5 fallido (alcanza el límite de 5 fallos en 60s)
+# esperado: 401 {"detail":"Credenciales inválidas"}
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "vendedor@example.com",
+  "password": "PasswordIncorrecta5!"
+}
+
+### C-05: Intento 6 rechazado por límite de tasa (Rate Limiting)
+# esperado: 429 Too Many Requests
+# cabeceras: Retry-After: <segundos> (ej. 58)
+# tiempo de respuesta: pocos milisegundos (sin cómputo bcrypt)
+# cuerpo: {"detail":"Demasiados intentos fallidos. Intente más tarde."}
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "vendedor@example.com",
+  "password": "PasswordIncorrecta6!"
+}
+
+# Verificación en base de datos tras el intento 6 (el intento 429 NO se registra):
+# SELECT id, cuando, email, ip, exito FROM intento_acceso WHERE email = 'vendedor@example.com' ORDER BY id;
+# Resultado: exactamente 5 filas con exito = false.
+
+### C-05: Recuperación de acceso tras expirar la ventana de 60s (Login exitoso)
+# esperado: 200 OK
+# cuerpo: {"mensaje":"Sesión iniciada","debe_cambiar_password":false,"expira_en_segundos":1800}
+# cabeceras: Set-Cookie con access_token
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "vendedor@example.com",
+  "password": "Secreto1234!"
+}
+
+### C-05: Intento fallido posterior al login exitoso (demuestra reinicio del contador)
+# esperado: 401 {"detail":"Credenciales inválidas"} (NO 429, porque el éxito reinició la cuenta)
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "vendedor@example.com",
+  "password": "PasswordIncorrectaPosterior!"
+}
