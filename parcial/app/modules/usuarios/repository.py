@@ -41,10 +41,53 @@ class AsignacionRolRepository(BaseRepository[AsignacionRol]):
         )
         return list((await self.session.scalars(consulta)).all())
 
+    async def obtener_asignaciones(self, usuario_id: int) -> list[AsignacionRol]:
+        """Devuelve todas las asignaciones históricas de un usuario (activas, vencidas y revocadas)."""
+        consulta = (
+            select(AsignacionRol)
+            .where(AsignacionRol.usuario_id == usuario_id)
+            .order_by(AsignacionRol.desde.asc(), AsignacionRol.id.asc())
+        )
+        return list((await self.session.scalars(consulta)).all())
+
+    async def obtener_abierta(self, usuario_id: int, rol: str) -> AsignacionRol | None:
+        """Devuelve la asignación que tiene revocada_en IS NULL para el par (usuario_id, rol)."""
+        consulta = select(AsignacionRol).where(
+            AsignacionRol.usuario_id == usuario_id,
+            AsignacionRol.rol == rol,
+            AsignacionRol.revocada_en.is_(None),
+        )
+        return (await self.session.scalars(consulta)).first()
+
+    async def contar_admins_vigentes(self) -> int:
+        """Cuenta los administradores que poseen una asignación activa y no vencida."""
+        ahora = datetime.now(timezone.utc)
+        consulta = select(func.count(AsignacionRol.id)).where(
+            AsignacionRol.rol == "ADMIN",
+            AsignacionRol.revocada_en.is_(None),
+            (AsignacionRol.vence_en.is_(None) | (AsignacionRol.vence_en > ahora)),
+        )
+        return (await self.session.scalar(consulta)) or 0
+
 
 class EventoSeguridadRepository(BaseRepository[EventoSeguridad]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, EventoSeguridad)
+
+    async def contar(self) -> int:
+        """Cuenta el total de eventos de seguridad registrados."""
+        consulta = select(func.count(EventoSeguridad.id))
+        return (await self.session.scalar(consulta)) or 0
+
+    async def listar_recientes(self, offset: int, limit: int) -> list[EventoSeguridad]:
+        """Lista eventos de seguridad ordenados de más recientes a más antiguos."""
+        consulta = (
+            select(EventoSeguridad)
+            .order_by(EventoSeguridad.cuando.desc(), EventoSeguridad.id.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        return list((await self.session.scalars(consulta)).all())
 
 
 class IntentoAccesoRepository(BaseRepository[IntentoAcceso]):

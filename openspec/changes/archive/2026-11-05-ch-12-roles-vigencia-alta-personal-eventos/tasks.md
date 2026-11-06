@@ -1,0 +1,23 @@
+# Tasks: CH-12 — Roles con vigencia, autoprotección, alta de personal y eventos de seguridad
+
+- [x] 1. Definir los DTOs en `parcial/app/modules/usuarios/schemas.py`: `UsuarioCreateAdminIn`, `UsuarioAdminOut`, `AsignacionRolCreateIn` (con validación de `vence_en`), `AsignacionRolOut` y `EventoSeguridadOut`.
+- [x] 2. Extender los repositorios en `parcial/app/modules/usuarios/repository.py`:
+  - En `AsignacionRolRepository`: `obtener_asignaciones`, `obtener_abierta`, `contar_admins_vigentes`.
+  - En `EventoSeguridadRepository`: `contar`, `listar_recientes`.
+- [x] 3. Implementar los métodos de negocio en `parcial/app/modules/usuarios/service.py`:
+  - `alta_personal`
+  - `listar_roles`
+  - `asignar_rol`
+  - `revocar_rol`
+  - `listar_eventos`
+- [x] 4. Crear y configurar los endpoints en `parcial/app/modules/usuarios/router.py` bajo `router_admin`:
+  - `POST /usuarios`
+  - `GET /usuarios/{id}/roles`
+  - `POST /usuarios/{id}/roles`
+  - `DELETE /usuarios/{id}/roles/{rol}`
+  - `GET /eventos`
+- [x] 5. Verificar que `parcial/app/main.py` monte correctamente `router_admin` en `grupo_protegido` con `requiere_rol("ADMIN")`.
+- [x] 6. Ejecutar y verificar de punta a punta con PostgreSQL real:
+  - `parcial/test/C-07_revocar_rol.http`
+  - `parcial/test/C-08_autoproteccion.http`
+- [x] 7. Documentar evidencia en `verify.md`, actualizar especificaciones y archivar el change.

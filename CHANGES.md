@@ -602,7 +602,7 @@ CH-03 queda fuera del camino crítico (independiente). CH-04, CH-05, CH-08, CH-0
   - `knowledge-base/09_decisiones_y_supuestos.md` (DD-30)
 
 ### [CH-12] `roles-vigencia-alta-personal-eventos`
-- **Estado**: `[ ]` pendiente
+- **Estado**: `[x]` completado
 - **Objetivo**: administración de roles con vencimiento, autoprotección (RN-05), alta de personal y consulta del historial de seguridad.
 - **Entra**:
   - `POST /usuarios` (alta de personal con contraseña provisoria de tipo `PasswordBcrypt` de CH-07, sin validación propia; `debe_cambiar_password = true`, rol inicial) → 201, 409, 422. Un solo UoW: usuario + asignación + línea de `evento_seguridad` (RN-16), actor = correo del admin. Hash antes de la transacción.
