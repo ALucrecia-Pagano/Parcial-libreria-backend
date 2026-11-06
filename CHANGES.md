@@ -529,7 +529,7 @@ CH-03 queda fuera del camino crítico (independiente). CH-04, CH-05, CH-08, CH-0
 # PARTE 4 — Autorización (Persona 4)
 
 ### [CH-10] `usuario-actual-roles-dos-grupos`
-- **Estado**: `[ ]` pendiente
+- **Estado**: [x] completado
 - **Objetivo**: saber quién es el usuario, qué roles vigentes tiene en la base, y montar los dos grupos de rutas.
 - **Entra**:
   - `app/core/dependencies.py`:

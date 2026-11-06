@@ -84,12 +84,12 @@ class UsuariosService:
             email=usuario.email,
             nombre=usuario.nombre,
             activo=usuario.activo,
+            debe_cambiar_password=usuario.debe_cambiar_password,
             roles_base=roles_base,
             roles_token=roles_token,
         )
 
     async def login(
-
         self,
         uow: UsuariosUnitOfWork,
         datos: LoginIn,

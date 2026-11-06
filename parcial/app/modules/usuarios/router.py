@@ -1,12 +1,12 @@
-"""Rutas de autenticación y usuarios (CH-07, CH-08 y CH-09)."""
+"""Rutas de autenticación y usuarios (CH-07, CH-08, CH-09 y CH-10)."""
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
 from app.core.database import SessionDep
+from app.core.dependencies import UsuarioActualDep
 from app.core.errores import traducir_integrity_error
-from app.core.security import decodificar_token
 from app.modules.usuarios.schemas import (
     LoginIn,
     LoginOut,
@@ -64,32 +64,17 @@ async def logout(
     status_code=status.HTTP_200_OK,
 )
 async def yo(
-    request: Request,
+    usuario_actual: UsuarioActualDep,
     session: SessionDep,
 ) -> UsuarioYoOut:
-    """Consulta la identidad del usuario actual, sus roles en BD y los declarados en el token."""
-    token = request.cookies.get("access_token")
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No autenticado",
-        )
-    try:
-        payload = decodificar_token(token)
-        usuario_id = int(payload.get("sub", 0))
-        roles_token = payload.get("roles", [])
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido o expirado",
-        )
-
+    """Consulta la identidad del usuario actual, sus roles en BD y los declarados en el token (CH-10)."""
     uow = UsuariosUnitOfWork(session)
-    return await service.obtener_yo(uow, usuario_id, roles_token)
+    return await service.obtener_yo(
+        uow, usuario_actual.id, usuario_actual.roles_token
+    )
 
 
 @router_abierto.post("/login", response_model=LoginOut)
-
 async def login(
     datos: LoginIn,
     request: Request,

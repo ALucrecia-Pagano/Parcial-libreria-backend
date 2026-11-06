@@ -1,0 +1,47 @@
+### C-01_param_no_entero.http
+### Caso C-01: Parámetro de ruta no entero con sesión iniciada
+### Demuestra: FastAPI valida el tipo del parámetro de ruta antes de ejecutar el handler (422),
+### incluso cuando la petición está autenticada con sesión válida.
+### Precondición: python seed.py
+
+@base = http://localhost:8000
+
+### 1. Iniciar sesión como ADMIN para obtener la cookie de sesión
+# @name loginAdmin
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "Secreto1234!"
+}
+
+# Esperado: 200 OK
+# Set-Cookie: access_token=...; HttpOnly; SameSite=Lax; Path=/
+# Cuerpo: { "mensaje": "Sesión iniciada", "debe_cambiar_password": false, "expira_en_segundos": 1800 }
+
+
+### 2. Petición autenticada a GET /libros/{id} con parámetro no entero ('abc')
+# @no-cookie-jar
+GET {{base}}/libros/abc
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
+
+# Esperado: 422 Unprocessable Entity
+# El handler no se ejecuta; el validador rechaza el parámetro 'abc' porque espera un int
+
+
+### 3. Petición autenticada a GET /clientes/{id} (ruta protegida staff) con parámetro no entero ('abc')
+# @no-cookie-jar
+GET {{base}}/clientes/abc
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
+
+# Esperado: 422 Unprocessable Entity
+# Pasa la guarda de autenticación/rol, pero falla la validación de ruta con 422 sin tocar el handler ni la base de datos
+
+
+### 4. Petición autenticada a GET /editoriales/{id}/libros con parámetro no entero ('xyz')
+# @no-cookie-jar
+GET {{base}}/editoriales/xyz/libros
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
+
+# Esperado: 422 Unprocessable Entity

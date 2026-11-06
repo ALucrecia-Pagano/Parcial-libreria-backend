@@ -59,10 +59,10 @@ class UsuarioYoOut(BaseModel):
     email: str
     nombre: str
     activo: bool
+    debe_cambiar_password: bool
     roles_base: list[str]
     roles_token: list[str]
 
 
 # Alias semántico
 UsuarioYoResponse = UsuarioYoOut
-
