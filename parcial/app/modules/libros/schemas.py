@@ -1,7 +1,7 @@
 """Contratos del catálogo y del objeto de asociación LibroAutor."""
 from decimal import Decimal
 from typing import Literal
-from pydantic import model_validator
+from pydantic import ConfigDict, model_validator
 from sqlmodel import Field, SQLModel
 from app.modules.autores.schemas import AutorRead
 from app.modules.editoriales.schemas import EditorialRead
@@ -15,6 +15,7 @@ class AutoriaCreate(SQLModel):
 
 
 class LibroCreate(SQLModel):
+    # LEGADO del TP: CH-06 lo cambia a stock_inicial (con su movimiento) y extra="forbid".
     isbn: str = Field(min_length=1)
     titulo: str = Field(min_length=1)
     precio: Decimal = Field(gt=0, max_digits=10, decimal_places=2)
@@ -25,17 +26,21 @@ class LibroCreate(SQLModel):
 
 
 class LibroUpdate(SQLModel):
-    isbn: str | None = Field(default=None, min_length=1)
+    """PATCH del libro: solo título y precio (CH-05).
+
+    El stock NO se edita por PATCH (RN-11): cambia con movimientos (CH-06). Con
+    extra="forbid", mandar stock, isbn u otro campo da 422.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
     titulo: str | None = Field(default=None, min_length=1)
     precio: Decimal | None = Field(default=None, gt=0, max_digits=10, decimal_places=2)
-    stock: int | None = Field(default=None, ge=0)
-    editorial_id: int | None = None
-    genero_id: int | None = None
-    autores: list[AutoriaCreate] | None = None
 
     @model_validator(mode="after")
     def rechazar_nulos(self):
-        for campo in self.model_fields_set - {"genero_id"}:
+        # Ausente = no se toca; null explícito = 422 (las columnas son NOT NULL).
+        for campo in self.model_fields_set:
             if getattr(self, campo) is None:
                 raise ValueError(f"{campo} no puede ser nulo")
         return self
@@ -59,9 +64,3 @@ class AutoriaRead(AutoriaCreate):
 
 class LibroDetalleRead(LibroRead):
     autores: list[AutoriaRead] = Field(validation_alias="autorias")
-
-
-class LibroDeAutorRead(SQLModel):
-    rol: str
-    orden: int
-    libro: LibroRead

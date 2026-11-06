@@ -337,7 +337,7 @@ CH-03 queda fuera del camino crítico (independiente). CH-04, CH-05, CH-08, CH-0
   - `knowledge-base/08_arquitectura_propuesta.md` (§Responsabilidades por archivo de módulo)
 
 ### [CH-05] `libros-baja-logica-patch-sin-stock`
-- **Estado**: `[ ]` pendiente
+- **Estado**: `[x]` hecho (archivado 05/11/2026 en `openspec/changes/archive/2026-11-05-ch-05-libros-baja-logica-patch-sin-stock/`)
 - **Objetivo**: libros con baja lógica, ISBN reutilizable y PATCH que no toca el stock; lecturas de catálogo por entidad.
 - **Entra**:
   - `libros/repository.py` con `LibroRepository(SoftDeleteRepository[Libro])`: listados filtran bajas; `listar(page,size,titulo,genero_id)` con **parámetros ligados** e `ILIKE` (sin concatenar SQL; `' OR '1'='1` devuelve lista vacía con `total 0`); precarga declarada adentro del método (autores, editorial, género).
