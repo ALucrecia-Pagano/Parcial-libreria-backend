@@ -1,66 +1,33 @@
-"""Lógica del módulo generos y traducción de errores de la base."""
+"""Reglas del módulo géneros.
 
-from typing import Sequence
-
+Cada función recibe el Unit of Work y lo abre con `async with uow:`. El nombre
+repetido (RN-01) lo rechaza la base (uq_genero_nombre): el IntegrityError sale
+del bloque, el Unit of Work revierte y el router responde 409 con mensaje propio.
+"""
 from fastapi import HTTPException, status
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
+from app.core.paginacion import Pagina, construir_pagina, validar_pagina
 from app.modules.generos.models import Genero
-from app.modules.generos.schemas import GeneroCreate, GeneroUpdate
+from app.modules.generos.schemas import GeneroCreate, GeneroRead
+from app.modules.generos.unit_of_work import GenerosUnitOfWork
 
 
-async def list_generos(
-    session: AsyncSession, limit: int, offset: int
-) -> Sequence[Genero]:
-    consulta = select(Genero).order_by(Genero.id).limit(limit).offset(offset)
-    result = await session.execute(consulta)
-    return result.scalars().all()
+async def listar(uow: GenerosUnitOfWork, page: int, size: int) -> Pagina[GeneroRead]:
+    async with uow:
+        total = await uow.generos.count()
+        validar_pagina(total, page, size)
+        items = await uow.generos.get_all(offset=(page - 1) * size, limit=size)
+        return construir_pagina([GeneroRead.model_validate(g) for g in items], total, page, size)
 
 
-async def get_genero(session: AsyncSession, genero_id: int) -> Genero:
-    genero = await session.get(Genero, genero_id)
-    if genero is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Género no encontrado",
-        )
-    return genero
+async def obtener(uow: GenerosUnitOfWork, genero_id: int) -> Genero:
+    async with uow:
+        genero = await uow.generos.get_by_id(genero_id)
+        if genero is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Género no encontrado")
+        return genero
 
 
-async def create_genero(session: AsyncSession, data: GeneroCreate) -> Genero:
-    genero = Genero.model_validate(data)
-    session.add(genero)
-    await _guardar(session, "Ya existe un género con ese nombre")
-    return genero
-
-
-async def update_genero(
-    session: AsyncSession, genero_id: int, data: GeneroUpdate
-) -> Genero:
-    genero = await get_genero(session, genero_id)
-    for campo, valor in data.model_dump(exclude_unset=True).items():
-        setattr(genero, campo, valor)
-    await _guardar(session, "Ya existe un género con ese nombre")
-    return genero
-
-
-async def delete_genero(session: AsyncSession, genero_id: int) -> None:
-    genero = await get_genero(session, genero_id)
-    await session.delete(genero)
-    await _guardar(
-        session, "No se puede borrar el género porque tiene libros asociados"
-    )
-
-
-async def _guardar(session: AsyncSession, mensaje_conflicto: str) -> None:
-    """Hace commit; si la base rechaza la escritura, responde 409 con mensaje propio."""
-    try:
-        await session.commit()
-    except IntegrityError:
-        await session.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=mensaje_conflicto,
-        ) from None
+async def crear(uow: GenerosUnitOfWork, datos: GeneroCreate) -> Genero:
+    async with uow:
+        return await uow.generos.add(Genero.model_validate(datos))

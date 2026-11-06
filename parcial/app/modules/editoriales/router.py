@@ -1,57 +1,72 @@
-"""Rutas HTTP del módulo editoriales: reciben, delegan y declaran la respuesta."""
+"""Rutas HTTP del módulo editoriales.
+
+El router construye el Unit of Work con una dependencia (misma sesión de la
+petición), se lo pasa al servicio sin abrirlo y traduce el IntegrityError a 409.
+
+Dos routers por convención del parcial:
+- router_abierto: lecturas, no piden sesión (el catálogo es público).
+- router_admin: escrituras; la guarda requiere_rol("ADMIN") llega con CH-10.
+No hay DELETE: el catálogo auxiliar no se borra (decisión del grupo, CH-04).
+"""
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 
-from app.core.database import get_session
+from app.core.database import SessionDep
+from app.core.errores import traducir_integrity_error
+from app.core.paginacion import Pagina, PaginacionDep
 from app.modules.editoriales import service
-from app.modules.editoriales.schemas import (
-    EditorialCreate,
-    EditorialRead,
-    EditorialUpdate,
-)
-
+from app.modules.editoriales.schemas import EditorialCreate, EditorialRead, EditorialUpdate
+from app.modules.editoriales.unit_of_work import EditorialesUnitOfWork
 from app.modules.libros.schemas import LibroRead
 from app.modules.libros.service import list_libros
 
-router = APIRouter(prefix="/editoriales", tags=["editoriales"])
+
+def get_uow(session: SessionDep) -> EditorialesUnitOfWork:
+    return EditorialesUnitOfWork(session)
 
 
-@router.post("/", response_model=EditorialRead, status_code=status.HTTP_201_CREATED)
-async def create(data: EditorialCreate, session: AsyncSession = Depends(get_session)):
-    return await service.create_editorial(session, data)
+UowDep = Annotated[EditorialesUnitOfWork, Depends(get_uow)]
+
+router_abierto = APIRouter(prefix="/editoriales", tags=["editoriales"])
+router_admin = APIRouter(prefix="/editoriales", tags=["editoriales"])
 
 
-@router.get("/", response_model=list[EditorialRead])
-async def list_all(
-    limit: int = Query(default=20, ge=1, le=100),
-    offset: int = Query(default=0, ge=0),
-    session: AsyncSession = Depends(get_session),
-):
-    return await service.list_editoriales(session, limit, offset)
+@router_abierto.get("", response_model=Pagina[EditorialRead])
+async def listar(uow: UowDep, paginacion: PaginacionDep):
+    return await service.listar(uow, paginacion.page, paginacion.size)
 
 
-@router.get("/{editorial_id}", response_model=EditorialRead)
-async def get_one(editorial_id: int, session: AsyncSession = Depends(get_session)):
-    return await service.get_editorial(session, editorial_id)
+@router_abierto.get("/{editorial_id}", response_model=EditorialRead)
+async def obtener(editorial_id: int, uow: UowDep):
+    return await service.obtener(uow, editorial_id)
 
 
-@router.patch("/{editorial_id}", response_model=EditorialRead)
-async def update(
+# Pendiente de CH-05 (fuera del alcance de CH-04): solo se adaptó para seguir
+# andando con el Unit of Work; CH-05 la reescribe con el repositorio de libros.
+@router_abierto.get("/{editorial_id}/libros", response_model=list[LibroRead])
+async def libros_de_la_editorial(
     editorial_id: int,
-    data: EditorialUpdate,
-    session: AsyncSession = Depends(get_session),
+    uow: UowDep,
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
 ):
-    return await service.update_editorial(session, editorial_id, data)
+    await service.obtener(uow, editorial_id)
+    return await list_libros(uow.session, limit, offset, editorial_id=editorial_id)
 
 
-@router.delete("/{editorial_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete(editorial_id: int, session: AsyncSession = Depends(get_session)):
-    await service.delete_editorial(session, editorial_id)
+@router_admin.post("", response_model=EditorialRead, status_code=status.HTTP_201_CREATED)
+async def crear(datos: EditorialCreate, uow: UowDep):
+    try:
+        return await service.crear(uow, datos)
+    except IntegrityError as exc:
+        raise traducir_integrity_error(exc) from None
 
 
-@router.get("/{editorial_id}/libros", response_model=list[LibroRead])
-async def libros_del_editorial(editorial_id: int, limit: int = Query(20, ge=1, le=100),
-                              offset: int = Query(0, ge=0), session: AsyncSession = Depends(get_session)):
-    await service.get_editorial(session, editorial_id)
-    return await list_libros(session, limit, offset, editorial_id=editorial_id)
+@router_admin.patch("/{editorial_id}", response_model=EditorialRead)
+async def actualizar(editorial_id: int, datos: EditorialUpdate, uow: UowDep):
+    try:
+        return await service.actualizar(uow, editorial_id, datos)
+    except IntegrityError as exc:
+        raise traducir_integrity_error(exc) from None
