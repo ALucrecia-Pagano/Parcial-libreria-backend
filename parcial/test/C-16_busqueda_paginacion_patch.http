@@ -7,9 +7,18 @@
 # fantástica (ed. 2, gén. 3) · 3 Ficciones (ed. 3, gén. 2) · 4 Respiración artificial
 # (ed. 2, gén. 1) · 5 Bestiario (ed. 3, gén. 2). Borges (autor 2) escribe el 2 y el 3.
 #
-# Nota: las guardas de rol (ADMIN para PATCH y DELETE) llegan con CH-10.
+# Desde CH-10 las escrituras piden ADMIN: el pedido 0 inicia sesión y los demás usan su cookie
+# (contraseña: la de PASSWORD_SEED en seed.py, misma convención que C-06).
 
 @base = http://localhost:8000
+
+### 0. Login del administrador (POST/PATCH/DELETE piden ADMIN desde CH-10)
+# esperado: 200 y Set-Cookie: access_token=...; HttpOnly
+# @name loginAdmin
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "email": "admin@example.com", "password": "Secreto1234!" }
 
 ############################################################
 # 1. Búsqueda por título con parámetros ligados
@@ -53,35 +62,45 @@ GET {{base}}/libros/1
 
 ### 3.1 Un solo campo
 # esperado: 200 titulo "Rayuela (edición aniversario)", precio sigue "25000.00", stock sigue 10
+# @no-cookie-jar
 PATCH {{base}}/libros/1
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
 Content-Type: application/json
 
 { "titulo": "Rayuela (edición aniversario)" }
 
 ### 3.2 Intento de editar el stock
 # esperado: 422 (extra_forbidden: el stock no se edita por PATCH)
+# @no-cookie-jar
 PATCH {{base}}/libros/1
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
 Content-Type: application/json
 
 { "stock": 99 }
 
 ### 3.3 Intento de editar el ISBN
 # esperado: 422 (el PATCH solo admite titulo y precio)
+# @no-cookie-jar
 PATCH {{base}}/libros/1
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
 Content-Type: application/json
 
 { "isbn": "978-950-00-9999-9" }
 
 ### 3.4 Precio no positivo
 # esperado: 422
+# @no-cookie-jar
 PATCH {{base}}/libros/1
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
 Content-Type: application/json
 
 { "precio": "0" }
 
 ### 3.5 Libro que no existe
 # esperado: 404 {"detail":"Libro no encontrado"}
+# @no-cookie-jar
 PATCH {{base}}/libros/9999
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
 Content-Type: application/json
 
 { "precio": "1000.00" }
@@ -92,7 +111,9 @@ Content-Type: application/json
 
 ### 4.1 Dar de baja Ficciones (tiene ventas: la fila se conserva)
 # esperado: 204 sin cuerpo
+# @no-cookie-jar
 DELETE {{base}}/libros/3
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
 
 ### 4.2 El libro dado de baja ya no se ve en el detalle
 # esperado: 404 {"detail":"Libro no encontrado"}
@@ -103,16 +124,22 @@ GET {{base}}/libros/3
 GET {{base}}/libros
 
 ### 4.4 La venta vieja lo sigue mostrando
-# esperado: 200 renglones con "titulo":"Ficciones" (y Rayuela)
+# esperado: 200 renglones con "titulo":"Ficciones" (y Rayuela) — /ventas/{id} pide sesión desde CH-10
+# @no-cookie-jar
 GET {{base}}/ventas/1
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
 
 ### 4.5 Darlo de baja otra vez
 # esperado: 404
+# @no-cookie-jar
 DELETE {{base}}/libros/3
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
 
 ### 4.6 Editar un libro dado de baja
 # esperado: 404
+# @no-cookie-jar
 PATCH {{base}}/libros/3
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
 Content-Type: application/json
 
 { "precio": "1000.00" }

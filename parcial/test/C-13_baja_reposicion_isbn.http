@@ -1,0 +1,173 @@
+# C-13 · Reponer un libro; darlo de baja; volver a cargar el mismo ISBN (CH-06)
+#
+# Antes de correr este archivo: python seed.py
+# Contraseña del seed: la de PASSWORD_SEED en seed.py (misma convención que C-06).
+#
+# Seed: Rayuela (libro 1, ISBN 978-950-00-0001-1) tiene stock 10 = Stock inicial 11 − Venta 1.
+# Correr EN ORDEN: la sección 2 da de baja Rayuela y la 3 vuelve a cargar su ISBN.
+
+@base = http://localhost:8000
+
+### 0. Login del administrador (la cookie se reusa abajo)
+# esperado: 200 y Set-Cookie: access_token=...; HttpOnly
+# @name loginAdmin
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "email": "admin@example.com", "password": "Secreto1234!" }
+
+############################################################
+# 1. Reposición: el stock cambia por un movimiento (RN-11)
+############################################################
+
+### 1.1 Reponer 5 ejemplares de Rayuela
+# esperado: 200 con el movimiento: {"libro_id":1, "cantidad":5, "motivo":"Reposición", "usuario_id":1, ...}
+# @no-cookie-jar
+POST {{base}}/libros/1/reponer
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{ "cantidad": 5 }
+
+### 1.2 Movimientos de Rayuela
+# esperado: 200 [Stock inicial +11, Venta −1, Reposición +5] → suma 15 = stock actual
+# @no-cookie-jar
+GET {{base}}/libros/1/movimientos
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
+
+### 1.3 Reposición con cantidad no positiva
+# esperado: 422
+# @no-cookie-jar
+POST {{base}}/libros/1/reponer
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{ "cantidad": 0 }
+
+### 1.4 Reponer un libro que no existe
+# esperado: 404 {"detail":"Libro no encontrado"}
+# @no-cookie-jar
+POST {{base}}/libros/9999/reponer
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{ "cantidad": 5 }
+
+### 1.5 Reponer sin sesión
+# esperado: 401
+# @no-cookie-jar
+POST {{base}}/libros/2/reponer
+Content-Type: application/json
+
+{ "cantidad": 5 }
+
+############################################################
+# 2. Baja lógica: no se puede reponer un libro dado de baja (RN-13)
+############################################################
+
+### 2.1 Dar de baja Rayuela
+# esperado: 204
+# @no-cookie-jar
+DELETE {{base}}/libros/1
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
+
+### 2.2 El catálogo ya no la muestra
+# esperado: 200 total 4, sin Rayuela
+GET {{base}}/libros
+
+### 2.3 Reponer un libro dado de baja
+# esperado: 409 (el libro está dado de baja)
+# @no-cookie-jar
+POST {{base}}/libros/1/reponer
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{ "cantidad": 5 }
+
+############################################################
+# 3. El ISBN se puede volver a usar (único solo entre vigentes, RN-01)
+############################################################
+
+### 3.1 Alta con el ISBN del libro dado de baja
+# esperado: 201 libro nuevo (id 6) con stock 4
+# @no-cookie-jar
+POST {{base}}/libros
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{
+  "isbn": "978-950-00-0001-1",
+  "titulo": "Rayuela",
+  "precio": "26000.00",
+  "stock_inicial": 4,
+  "editorial_id": 1,
+  "genero_id": 1,
+  "autores": [ { "autor_id": 1, "rol": "autor", "orden": 1 } ]
+}
+
+### 3.2 El alta dejó su movimiento «Stock inicial»
+# esperado: 200 [Stock inicial +4]
+# @no-cookie-jar
+GET {{base}}/libros/6/movimientos
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
+
+### 3.3 Un segundo vigente con el mismo ISBN
+# esperado: 409 {"detail":"Ya existe un libro activo con ese ISBN"}
+# @no-cookie-jar
+POST {{base}}/libros
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{
+  "isbn": "978-950-00-0001-1",
+  "titulo": "Rayuela (otra edición)",
+  "precio": "26000.00",
+  "stock_inicial": 1,
+  "editorial_id": 1,
+  "genero_id": 1,
+  "autores": [ { "autor_id": 1, "rol": "autor", "orden": 1 } ]
+}
+
+### 3.4 La venta vieja sigue mostrando el título del libro dado de baja
+# esperado: 200 renglón con "libro_id":1, "titulo":"Rayuela"
+# @no-cookie-jar
+GET {{base}}/ventas/1
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
+
+############################################################
+# 4. El alta no acepta stock directo
+############################################################
+
+### 4.1 Alta con "stock" en lugar de "stock_inicial"
+# esperado: 422 (extra_forbidden)
+# @no-cookie-jar
+POST {{base}}/libros
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{
+  "isbn": "978-950-00-0007-3",
+  "titulo": "Libro de prueba",
+  "precio": "10000.00",
+  "stock": 3,
+  "editorial_id": 1,
+  "genero_id": 1,
+  "autores": [ { "autor_id": 1, "rol": "autor", "orden": 1 } ]
+}
+
+### 4.2 Alta con stock_inicial 0: no deja movimiento (CHECK cantidad <> 0)
+# esperado: 201 libro nuevo (id 7, salvo que algún 409 anterior haya consumido ids) con stock 0
+# @no-cookie-jar
+POST {{base}}/libros
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{
+  "isbn": "978-950-00-0008-0",
+  "titulo": "Libro sin stock",
+  "precio": "10000.00",
+  "stock_inicial": 0,
+  "editorial_id": 1,
+  "genero_id": 1,
+  "autores": [ { "autor_id": 1, "rol": "autor", "orden": 1 } ]
+}
