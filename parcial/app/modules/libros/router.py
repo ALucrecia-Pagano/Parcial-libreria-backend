@@ -6,7 +6,8 @@ petición), se lo pasa al servicio sin abrirlo y traduce el IntegrityError a 409
 - router_abierto: catálogo público (listado y detalle).
 - router_por_entidad: libros vigentes de una editorial, un género o un autor
   (públicos; viven acá porque los resuelve el repositorio de libros).
-- router_admin: PATCH y baja lógica; requiere_rol("ADMIN") llega con CH-10.
+- router_admin: alta, PATCH, baja lógica, reposición y movimientos; main.py lo monta
+  con requiere_rol("ADMIN") (CH-10). El usuario del movimiento sale de get_usuario_actual.
 """
 from typing import Annotated
 
@@ -14,10 +15,18 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.exc import IntegrityError
 
 from app.core.database import SessionDep
+from app.core.dependencies import UsuarioActualDep
 from app.core.errores import traducir_integrity_error
 from app.core.paginacion import Pagina, PaginacionDep
 from app.modules.libros import service
-from app.modules.libros.schemas import LibroCreate, LibroDetalleRead, LibroRead, LibroUpdate
+from app.modules.libros.schemas import (
+    LibroCreate,
+    LibroDetalleRead,
+    LibroRead,
+    LibroUpdate,
+    MovimientoRead,
+    ReponerIn,
+)
 from app.modules.libros.unit_of_work import LibrosUnitOfWork
 
 
@@ -75,7 +84,22 @@ async def dar_de_baja(libro_id: int, uow: UowDep):
     await service.dar_de_baja(uow, libro_id)
 
 
-# LEGADO del TP hasta CH-06 (alta con stock directo, sin Unit of Work).
 @router_admin.post("", response_model=LibroDetalleRead, status_code=status.HTTP_201_CREATED)
-async def crear(data: LibroCreate, session: SessionDep):
-    return await service.create_libro(session, data)
+async def crear(datos: LibroCreate, uow: UowDep, usuario: UsuarioActualDep):
+    try:
+        return await service.crear(uow, datos, usuario.id)
+    except IntegrityError as exc:
+        raise traducir_integrity_error(exc) from None
+
+
+@router_admin.post("/{libro_id}/reponer", response_model=MovimientoRead)
+async def reponer(libro_id: int, datos: ReponerIn, uow: UowDep, usuario: UsuarioActualDep):
+    try:
+        return await service.reponer(uow, libro_id, datos.cantidad, usuario.id)
+    except IntegrityError as exc:
+        raise traducir_integrity_error(exc) from None
+
+
+@router_admin.get("/{libro_id}/movimientos", response_model=list[MovimientoRead])
+async def movimientos(libro_id: int, uow: UowDep):
+    return await service.movimientos(uow, libro_id)

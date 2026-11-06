@@ -376,7 +376,7 @@ CH-03 queda fuera del camino crítico (independiente). CH-04, CH-05, CH-08, CH-0
   - `knowledge-base/11_endpoints_y_casos_de_prueba.md` (filas de `/libros` y `/{x}/{id}/libros`; C-13, C-16)
 
 ### [CH-06] `stock-punto-unico-reponer-movimientos`
-- **Estado**: `[ ]` pendiente
+- **Estado**: `[x]` hecho (archivado 06/11/2026 en `openspec/changes/archive/2026-11-06-ch-06-stock-punto-unico-reponer-movimientos/`)
 - **Objetivo**: un único lugar donde se escribe el stock (alta, reposición, venta), y los endpoints que lo usan.
 - **Entra**:
   - `libros/stock.py` (o método de servicio) `aplicar_movimiento(uow, libro, cantidad, motivo, usuario_id, venta_id=None)`: actualiza `libro.stock` **y** agrega la fila de `movimiento_stock` en la misma operación. **Es el único código del proyecto que escribe `libro.stock`.** Motivos: "Stock inicial", "Reposición", "Venta" (texto libre).

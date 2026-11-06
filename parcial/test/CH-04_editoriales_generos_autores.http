@@ -2,10 +2,18 @@
 # Antes de correr este archivo: python seed.py (deja 3 editoriales, 3 géneros y 6 autores).
 # Correr los pedidos EN ORDEN: algunos dependen de los anteriores (los 201 crean filas).
 #
-# Nota: las guardas de rol (ADMIN para POST y PATCH) llegan con CH-10. Cuando estén en
-# main, este archivo suma el login de admin@example.com y la cookie en los POST/PATCH.
+# Desde CH-10 las escrituras piden ADMIN: el pedido 0 inicia sesión y los demás usan su cookie
+# (contraseña: la de PASSWORD_SEED en seed.py, misma convención que C-06).
 
 @base = http://localhost:8000
+
+### 0. Login del administrador (POST/PATCH/DELETE piden ADMIN desde CH-10)
+# esperado: 200 y Set-Cookie: access_token=...; HttpOnly
+# @name loginAdmin
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "email": "admin@example.com", "password": "Secreto1234!" }
 
 ############################################################
 # 1. Listados con envoltorio {items, total, page, size, pages}
@@ -33,7 +41,9 @@ GET {{base}}/generos
 
 ### 2.1 Género con nombre repetido
 # esperado: 409 {"detail":"Ya existe un género con ese nombre"} (sin texto de la base)
+# @no-cookie-jar
 POST {{base}}/generos
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
 Content-Type: application/json
 
 { "nombre": "Novela" }
@@ -41,21 +51,27 @@ Content-Type: application/json
 ### 2.2 Género nuevo
 # esperado: 201 {"id":5, "nombre":"Ensayo"}
 # (id 5 y no 4: el INSERT rechazado en 2.1 igual consumió el 4 de la secuencia)
+# @no-cookie-jar
 POST {{base}}/generos
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
 Content-Type: application/json
 
 { "nombre": "Ensayo" }
 
 ### 2.3 Género con un campo que el contrato no declara
 # esperado: 422 (extra="forbid": "Extra inputs are not permitted")
+# @no-cookie-jar
 POST {{base}}/generos
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
 Content-Type: application/json
 
 { "nombre": "Poesía", "descripcion": "no existe en el contrato" }
 
 ### 2.4 Editorial con nombre repetido
 # esperado: 409 {"detail":"Ya existe una editorial con ese nombre"}
+# @no-cookie-jar
 POST {{base}}/editoriales
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
 Content-Type: application/json
 
 { "nombre": "Letras del Río", "pais": "Argentina" }
@@ -63,14 +79,18 @@ Content-Type: application/json
 ### 2.5 Editorial nueva
 # esperado: 201 {"id":5, "nombre":"Ediciones Cuyo", "pais":"Argentina"}
 # (id 5: el INSERT rechazado en 2.4 consumió el 4)
+# @no-cookie-jar
 POST {{base}}/editoriales
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
 Content-Type: application/json
 
 { "nombre": "Ediciones Cuyo", "pais": "Argentina" }
 
 ### 2.6 Autor sin nombre
 # esperado: 422 (nombre es obligatorio)
+# @no-cookie-jar
 POST {{base}}/autores
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
 Content-Type: application/json
 
 { "nacionalidad": "Argentina" }
@@ -78,7 +98,9 @@ Content-Type: application/json
 ### 2.7 Autor nuevo
 # esperado: 201 {"id":7, "nombre":"Antonio Di Benedetto", "nacionalidad":"Argentina"}
 # (acá sí 7: el 422 de 2.6 lo frena el contrato, nunca llega a la base)
+# @no-cookie-jar
 POST {{base}}/autores
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
 Content-Type: application/json
 
 { "nombre": "Antonio Di Benedetto", "nacionalidad": "Argentina" }
@@ -89,42 +111,54 @@ Content-Type: application/json
 
 ### 3.1 Editorial: un solo campo
 # esperado: 200 {"id":1, "nombre":"Letras del Río", "pais":"Uruguay"} (el nombre NO cambia)
+# @no-cookie-jar
 PATCH {{base}}/editoriales/1
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
 Content-Type: application/json
 
 { "pais": "Uruguay" }
 
 ### 3.2 Editorial: campo extra
 # esperado: 422 (extra="forbid")
+# @no-cookie-jar
 PATCH {{base}}/editoriales/1
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
 Content-Type: application/json
 
 { "pais": "Chile", "stock": 5 }
 
 ### 3.3 Editorial que no existe
 # esperado: 404 {"detail":"Editorial no encontrada"}
+# @no-cookie-jar
 PATCH {{base}}/editoriales/9999
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
 Content-Type: application/json
 
 { "pais": "Chile" }
 
 ### 3.4 Editorial: renombrar a un nombre que ya existe
 # esperado: 409 {"detail":"Ya existe una editorial con ese nombre"}
+# @no-cookie-jar
 PATCH {{base}}/editoriales/2
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
 Content-Type: application/json
 
 { "nombre": "Letras del Río" }
 
 ### 3.5 Autor: un solo campo
 # esperado: 200 {"id":6, "nombre":"Juan José Saer", "nacionalidad":"Argentino-francesa"}
+# @no-cookie-jar
 PATCH {{base}}/autores/6
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
 Content-Type: application/json
 
 { "nacionalidad": "Argentino-francesa" }
 
 ### 3.6 Autor que no existe
 # esperado: 404 {"detail":"Autor no encontrado"}
+# @no-cookie-jar
 PATCH {{base}}/autores/9999
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
 Content-Type: application/json
 
 { "nacionalidad": "Chilena" }
@@ -135,14 +169,18 @@ Content-Type: application/json
 
 ### 4.1 PATCH de géneros (la consigna no lo tiene)
 # esperado: 405 Method Not Allowed
+# @no-cookie-jar
 PATCH {{base}}/generos/1
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
 Content-Type: application/json
 
 { "nombre": "Novela larga" }
 
 ### 4.2 DELETE de editoriales (decisión del grupo: el catálogo auxiliar no se borra)
 # esperado: 405 Method Not Allowed
+# @no-cookie-jar
 DELETE {{base}}/editoriales/3
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
 
 ### 4.3 Parámetro de ruta que no es entero
 # esperado: 422

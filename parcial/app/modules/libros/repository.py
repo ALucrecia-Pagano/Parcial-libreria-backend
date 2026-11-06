@@ -5,6 +5,9 @@ libros dados de baja (RN-13) y la baja es lógica (soft_delete pone borrado_en).
 Cada método se nombra por lo que trae y declara adentro su precarga, para que
 ninguna lectura dependa de la carga perezosa (consigna §6.5).
 
+MovimientoStockRepository solo agrega y lee: movimiento_stock es de solo agregado
+(RN-12); no tiene métodos para modificar ni borrar.
+
 La búsqueda por título usa parámetros ligados (icontains → ILIKE con el valor
 como parámetro y los comodines escapados): ' OR '1'='1 se busca como texto.
 """
@@ -14,8 +17,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-from app.core.repository import SoftDeleteRepository
-from app.modules.libros.models import Libro, LibroAutor
+from app.core.repository import BaseRepository, SoftDeleteRepository
+from app.modules.libros.models import Libro, LibroAutor, MovimientoStock
 
 
 class LibroRepository(SoftDeleteRepository[Libro]):
@@ -96,3 +99,23 @@ class LibroRepository(SoftDeleteRepository[Libro]):
             .order_by(Libro.id)
         )
         return (await self.session.scalars(consulta)).all()
+
+
+class MovimientoStockRepository(BaseRepository[MovimientoStock]):
+    def __init__(self, session: AsyncSession) -> None:
+        super().__init__(session, MovimientoStock)
+
+    async def listar_de_libro(self, libro_id: int) -> Sequence[MovimientoStock]:
+        """Movimientos de un libro en el orden en que ocurrieron."""
+        consulta = (
+            select(MovimientoStock)
+            .where(MovimientoStock.libro_id == libro_id)
+            .order_by(MovimientoStock.cuando, MovimientoStock.id)
+        )
+        return (await self.session.scalars(consulta)).all()
+
+    async def update(self, entity, cambios=None):  # pragma: no cover - protección explícita
+        raise NotImplementedError("movimiento_stock es de solo agregado (RN-12)")
+
+    async def delete(self, entity) -> None:  # pragma: no cover - protección explícita
+        raise NotImplementedError("movimiento_stock es de solo agregado (RN-12)")
