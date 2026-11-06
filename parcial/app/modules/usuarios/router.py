@@ -1,4 +1,4 @@
-"""Rutas de autenticación y usuarios (CH-07, CH-08, CH-09 y CH-10)."""
+"""Rutas de autenticación y usuarios (CH-07, CH-08, CH-09, CH-10 y CH-11)."""
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from sqlalchemy.exc import IntegrityError
@@ -8,6 +8,8 @@ from app.core.database import SessionDep
 from app.core.dependencies import UsuarioActualDep
 from app.core.errores import traducir_integrity_error
 from app.modules.usuarios.schemas import (
+    CambiarPasswordIn,
+    CambiarPasswordOut,
     LoginIn,
     LoginOut,
     LogoutOut,
@@ -112,3 +114,18 @@ async def login(
         secure=settings.COOKIE_SECURE,
     )
     return resultado
+
+
+@router_abierto.post(
+    "/cambiar-password",
+    response_model=CambiarPasswordOut,
+    status_code=status.HTTP_200_OK,
+)
+async def cambiar_password(
+    datos: CambiarPasswordIn,
+    usuario_actual: UsuarioActualDep,
+    session: SessionDep,
+) -> CambiarPasswordOut:
+    """Cambia la contraseña del usuario autenticado, registrando auditoría y desactivando debe_cambiar_password (CH-11)."""
+    uow = UsuariosUnitOfWork(session)
+    return await service.cambiar_password(uow, usuario_actual, datos)

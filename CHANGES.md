@@ -567,7 +567,7 @@ CH-03 queda fuera del camino crítico (independiente). CH-04, CH-05, CH-08, CH-0
   - `knowledge-base/11_endpoints_y_casos_de_prueba.md` (los tres grupos de rutas)
 
 ### [CH-11] `cambiar-password-cambio-obligatorio`
-- **Estado**: `[ ]` pendiente
+- **Estado**: [x] completado
 - **Objetivo**: cambio de contraseña con auditoría y desbloqueo del cambio obligatorio.
 - **Entra**:
   - `POST /auth/cambiar-password` (`password_actual` y `password_nueva`, **ambas de tipo `PasswordBcrypt`** de CH-07, sin validación propia; `extra="forbid"`) → 200, 401 (sin sesión **o `password_actual` incorrecta**, mismo criterio que el login; DD-30), 422 (cuerpo que rompe el contrato). Ambos hashes/verificaciones se hacen **antes** de abrir la transacción.

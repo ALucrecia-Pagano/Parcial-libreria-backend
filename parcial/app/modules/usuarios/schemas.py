@@ -1,4 +1,4 @@
-"""DTOs de entrada y salida del módulo usuarios (CH-07 y CH-08)."""
+"""DTOs de entrada y salida del módulo usuarios (CH-07, CH-08, CH-10 y CH-11)."""
 
 from pydantic import BaseModel, ConfigDict, EmailStr
 
@@ -66,3 +66,16 @@ class UsuarioYoOut(BaseModel):
 
 # Alias semántico
 UsuarioYoResponse = UsuarioYoOut
+
+
+class CambiarPasswordIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    password_actual: PasswordBcrypt
+    password_nueva: PasswordBcrypt
+
+
+class CambiarPasswordOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mensaje: str = "Contraseña actualizada correctamente"

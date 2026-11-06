@@ -1,14 +1,17 @@
-"""Lógica de negocio del módulo usuarios y autenticación (CH-07, CH-08 y CH-09)."""
+"""Lógica de negocio del módulo usuarios y autenticación (CH-07, CH-08, CH-09, CH-10 y CH-11)."""
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import settings
+from app.core.dependencies import UsuarioActual
 from app.core.security import crear_token, hashear_password, verificar_password
 from app.modules.clientes.models import Cliente
-from app.modules.usuarios.models import AsignacionRol, Usuario
+from app.modules.usuarios.models import AsignacionRol, EventoSeguridad, Usuario
 from app.modules.usuarios.repository import registrar_intento
 from app.modules.usuarios.schemas import (
+    CambiarPasswordIn,
+    CambiarPasswordOut,
     LoginIn,
     LoginOut,
     RegistroIn,
@@ -154,3 +157,43 @@ class UsuariosService:
             expira_en_segundos=settings.JWT_MINUTOS * 60,
         )
         return token, respuesta
+
+    async def cambiar_password(
+        self,
+        uow: UsuariosUnitOfWork,
+        usuario_actual: UsuarioActual,
+        datos: CambiarPasswordIn,
+    ) -> CambiarPasswordOut:
+        """Cambia la contraseña del usuario autenticado, registrando auditoría en evento_seguridad (RN-16, DD-30)."""
+        # 1. Verificación previa fuera de la transacción (cátedra §5.6, §6.7)
+        password_valida = await verificar_password(
+            datos.password_actual, usuario_actual.usuario.password_hash
+        )
+        if not password_valida:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Contraseña actual incorrecta",
+            )
+
+        # 2. Hash previo fuera de la transacción
+        nuevo_hash = await hashear_password(datos.password_nueva)
+
+        # 3. Un solo bloque async with uow: (RN-16)
+        async with uow:
+            usuario = await uow.usuarios.get_by_id(usuario_actual.id)
+            if usuario is None or not usuario.activo:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Usuario no encontrado o inactivo",
+                )
+            usuario.password_hash = nuevo_hash
+            usuario.debe_cambiar_password = False
+            await uow.usuarios.add(usuario)
+
+            evento = EventoSeguridad(
+                actor=usuario.email,
+                accion="Cambio de contraseña",
+            )
+            await uow.eventos.add(evento)
+
+        return CambiarPasswordOut(mensaje="Contraseña actualizada correctamente")
