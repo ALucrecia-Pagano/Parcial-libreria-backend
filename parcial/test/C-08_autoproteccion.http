@@ -1,0 +1,149 @@
+### C-08_autoproteccion.http
+### Caso C-08: Autoprotección del rol ADMIN, alta de personal y consulta de eventos
+### Demuestra:
+### - RN-05: Un administrador no puede revocarse su propio rol ADMIN (409 Conflict).
+### - RN-05: No se puede revocar el rol ADMIN si ello dejaría cero administradores vigentes en el sistema (409 Conflict).
+### - Alta de personal (POST /usuarios): contraseña provisoria (máx 72 bytes UTF-8), debe_cambiar_password=true,
+###   asignación de rol y auditoría en evento_seguridad en el mismo Unit of Work (RN-16).
+### - GET /eventos: consulta paginada de auditoría para ADMIN ordenada de más reciente a más antiguo (200 / 422 si size > 100).
+### Precondición: python seed.py
+
+@base = http://localhost:8000
+
+### 1. Iniciar sesión como ADMIN 1 (admin@example.com, id = 1)
+# @name loginAdmin1
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "Secreto1234!"
+}
+
+# Esperado: 200 OK
+# Set-Cookie: access_token=...; HttpOnly; SameSite=Lax; Path=/
+
+
+### 2. Autoprotección 1: Admin 1 intenta revocarse su PROPIO rol ADMIN
+# @no-cookie-jar
+DELETE {{base}}/usuarios/1/roles/ADMIN
+Cookie: {{loginAdmin1.response.headers.Set-Cookie}}
+
+# Esperado: 409 Conflict
+# Detalle: "Un administrador no puede revocarse su propio rol ADMIN" (RN-05)
+
+
+### 3. Iniciar sesión como ADMIN 2 (admin2@example.com, id = 2)
+# @name loginAdmin2
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin2@example.com",
+  "password": "Secreto1234!"
+}
+
+# Esperado: 200 OK
+# Set-Cookie: access_token=...; HttpOnly; SameSite=Lax; Path=/
+
+
+### 4. Admin 2 revoca el rol ADMIN a Admin 1 (quedando Admin 2 como único admin vigente)
+# @no-cookie-jar
+DELETE {{base}}/usuarios/1/roles/ADMIN
+Cookie: {{loginAdmin2.response.headers.Set-Cookie}}
+
+# Esperado: 200 OK
+# Queda un único administrador vigente en el sistema (Admin 2).
+
+
+### 5. Autoprotección 2: Admin 2 intenta revocar al ÚLTIMO admin vigente del sistema
+# @no-cookie-jar
+DELETE {{base}}/usuarios/2/roles/ADMIN
+Cookie: {{loginAdmin2.response.headers.Set-Cookie}}
+
+# Esperado: 409 Conflict
+# Detalle: "No se puede revocar el rol: no pueden quedar cero administradores vigentes en el sistema" (RN-05)
+
+
+### 6. Alta de personal (POST /usuarios) con contraseña de más de 72 bytes
+# @no-cookie-jar
+POST {{base}}/usuarios
+Cookie: {{loginAdmin2.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{
+  "email": "personal_invalido@example.com",
+  "nombre": "Personal Invalido",
+  "password": "PasswordDemasiadoLargaQueSuperaConMuchoLosSetentaYDosBytesUtfaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "rol": "VENDEDOR"
+}
+
+# Esperado: 422 Unprocessable Entity
+# Límite estricto de 72 bytes en la contraseña provisoria (PasswordBcrypt).
+
+
+### 7. Alta de personal válida por ADMIN (POST /usuarios)
+# @no-cookie-jar
+POST {{base}}/usuarios
+Cookie: {{loginAdmin2.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{
+  "email": "empleado_nuevo@example.com",
+  "nombre": "Carlos Empleado",
+  "password": "PasswordProvisoria123!",
+  "rol": "VENDEDOR"
+}
+
+# Esperado: 201 Created
+# Crea el usuario con debe_cambiar_password = true, asigna el rol y registra en evento_seguridad (RN-16).
+
+
+### 8. Intentar alta con email ya existente (conflicto de unicidad)
+# @no-cookie-jar
+POST {{base}}/usuarios
+Cookie: {{loginAdmin2.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{
+  "email": "empleado_nuevo@example.com",
+  "nombre": "Carlos Duplicado",
+  "password": "PasswordProvisoria123!",
+  "rol": "VENDEDOR"
+}
+
+# Esperado: 409 Conflict
+# Mensaje traducido: "Ya existe un usuario con ese email"
+
+
+### 9. Login del personal recién creado: debe recibir debe_cambiar_password = true
+# @name loginNuevoPersonal
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "empleado_nuevo@example.com",
+  "password": "PasswordProvisoria123!"
+}
+
+# Esperado: 200 OK
+# Cuerpo: { "mensaje": "Sesión iniciada", "debe_cambiar_password": true, "expira_en_segundos": 1800 }
+
+
+### 10. Consulta de eventos de seguridad (GET /eventos) por ADMIN
+# @no-cookie-jar
+GET {{base}}/eventos?page=1&size=10
+Cookie: {{loginAdmin2.response.headers.Set-Cookie}}
+
+# Esperado: 200 OK
+# Retorna envoltura paginada: { "items": [...], "total": N, "page": 1, "size": 10, "pages": M }
+# Ordenados por 'cuando' descendente (más recientes primero).
+
+
+### 11. Consulta de eventos con tamaño de página inválido (size = 500 supera el máximo 100)
+# @no-cookie-jar
+GET {{base}}/eventos?size=500
+Cookie: {{loginAdmin2.response.headers.Set-Cookie}}
+
+# Esperado: 422 Unprocessable Entity
+# paginacion.py limita size entre 1 y 100

@@ -1,0 +1,44 @@
+@base = http://localhost:8000
+
+### C-04: Usuario existente con contraseña incorrecta
+# esperado: 401 {"detail":"Credenciales inválidas"}
+# tiempo: ~150-300ms (verificación real bcrypt)
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "PasswordIncorrecta!"
+}
+
+### C-04: Usuario inexistente en la base de datos
+# esperado: 401 {"detail":"Credenciales inválidas"}
+# tiempo: ~150-300ms (verificación contra hash ficticio, indistinguible en tiempo)
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "inexistente@example.com",
+  "password": "PasswordIncorrecta!"
+}
+
+### C-04: Contraseña de más de 72 bytes en UTF-8 (37 'ñ' = 74 bytes)
+# esperado: 422 Unprocessable Entity (rechazo previo en validación Pydantic, sin 500)
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "ñññññññññññññññññññññññññññññññññññññ"
+}
+
+### C-04: Campo extra en el cuerpo (extra="forbid")
+# esperado: 422 Unprocessable Entity
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "Secreto1234!",
+  "campo_extra": "no_permitido"
+}
