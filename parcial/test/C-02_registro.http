@@ -1,0 +1,82 @@
+### C-02: Auto-registro atómico de clientes, cierre de sesión y consulta de identidad
+### Reglas verificadas: RN-02 (registro atómico), RN-01 (unicidad en usuario y cliente sin consulta previa),
+### RN-15 (mensajes propios en 409), DD-18 (logout sin sesión responde 200).
+
+@api = http://localhost:8000
+
+### 1. Registro exitoso de nuevo cliente
+# Esperado: 201 Created sin campo password_hash
+POST {{api}}/auth/registro
+Content-Type: application/json
+
+{
+  "nombre": "Carlos Alumno",
+  "email": "carlos_alumno@example.com",
+  "password": "Password123!"
+}
+
+### 2. Login con el usuario recién registrado
+# Esperado: 200 OK con Set-Cookie access_token
+POST {{api}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "carlos_alumno@example.com",
+  "password": "Password123!"
+}
+
+### 3. Registro con correo de usuario existente
+# Esperado: 409 Conflict con mensaje propio ("Ya existe un usuario con ese email")
+POST {{api}}/auth/registro
+Content-Type: application/json
+
+{
+  "nombre": "Carlos Alumno Bis",
+  "email": "carlos_alumno@example.com",
+  "password": "Password123!"
+}
+
+### 4. Registro con correo de ficha de cliente existente (Tomás Ríos, cliente sin usuario)
+# Esperado: 409 Conflict con mensaje propio ("Ya existe un cliente con ese email")
+# Garantía: Se revierte la transacción completa; no se crea usuario huérfano ni se altera Tomás Ríos
+POST {{api}}/auth/registro
+Content-Type: application/json
+
+{
+  "nombre": "Tomás Intruso",
+  "email": "tomas@example.com",
+  "password": "Password123!"
+}
+
+### 5. Rechazo por intento de autoasignarse rol en el payload (contrato estricto extra="forbid")
+# Esperado: 422 Unprocessable Entity
+POST {{api}}/auth/registro
+Content-Type: application/json
+
+{
+  "nombre": "Hacker",
+  "email": "hacker@example.com",
+  "password": "Password123!",
+  "rol": "ADMIN"
+}
+
+### 6. Rechazo por contraseña mayor a 72 bytes en UTF-8 (37 eñes = 74 bytes)
+# Esperado: 422 Unprocessable Entity (no 500)
+POST {{api}}/auth/registro
+Content-Type: application/json
+
+{
+  "nombre": "Usuario Clave Larga",
+  "email": "clavelarga@example.com",
+  "password": "ñññññññññññññññññññññññññññññññññññññ"
+}
+
+### 7. Cierre de sesión sin sesión previa (idempotente)
+# Esperado: 200 OK con Set-Cookie Max-Age=0
+POST {{api}}/auth/logout
+Content-Type: application/json
+
+### 8. Consulta de identidad sin sesión activa
+# Esperado: 401 Unauthorized
+GET {{api}}/auth/yo
+Accept: application/json

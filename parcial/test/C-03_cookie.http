@@ -1,0 +1,35 @@
+@base = http://localhost:8000
+
+### C-03: Login correcto devuelve 200, cookie HttpOnly y cuerpo sin token
+# esperado: 200 OK
+# cabeceras: Set-Cookie: access_token=...; HttpOnly; Path=/; SameSite=lax; Max-Age=1800
+# cuerpo: {"mensaje":"Sesión iniciada","debe_cambiar_password":false,"expira_en_segundos":1800} (sin token en el cuerpo)
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "Secreto1234!"
+}
+
+### C-03: Login correcto con usuario que debe cambiar contraseña
+# esperado: 200 OK con debe_cambiar_password: true
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "nuevo@example.com",
+  "password": "Secreto1234!"
+}
+
+### C-03: Consulta a GET /auth/yo sin cookie de sesión (CH-10)
+# esperado: 401 Unauthorized
+# @no-cookie-jar
+GET {{base}}/auth/yo
+
+### C-03: Consulta a GET /auth/yo con Authorization Bearer y sin cookie (CH-10, Regla 18 de AGENTS.md)
+# El token solo viaja en la cookie HttpOnly access_token; la cabecera Authorization se ignora y responde 401
+# esperado: 401 Unauthorized
+# @no-cookie-jar
+GET {{base}}/auth/yo
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M

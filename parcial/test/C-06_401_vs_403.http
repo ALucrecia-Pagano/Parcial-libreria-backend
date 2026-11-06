@@ -1,0 +1,149 @@
+### C-06_401_vs_403.http
+### Caso C-06: Distinción entre 401 (no autenticado / inactivo) y 403 (no autorizado / rol insuficiente)
+### Demuestra:
+### - Sin cookie de sesión o sesión inválida -> 401 Unauthorized
+### - Con sesión válida pero sin el rol requerido por el endpoint -> 403 Forbidden
+### - Con el rol requerido (ADMIN) -> pasa el guarda de autorización
+### - Usuario desactivado en base (activo = false) -> 401 Unauthorized en la siguiente petición
+### - Acceso a recursos propios vs ajenos (RN-14): el cliente ve su propia venta y no la ajena (CH-14)
+### Precondición: python seed.py
+
+@base = http://localhost:8000
+
+### 1. POST /libros sin sesión (sin cookie)
+# @no-cookie-jar
+POST {{base}}/libros
+Content-Type: application/json
+
+{
+  "isbn": "978-950-00-0006-6",
+  "titulo": "Los que aman, odian",
+  "precio": "21000.00",
+  "stock_inicial": 4,
+  "editorial_id": 1,
+  "genero_id": 1,
+  "autores": [
+    { "autor_id": 3, "rol": "coautor", "orden": 1 },
+    { "autor_id": 4, "rol": "coautor", "orden": 2 }
+  ]
+}
+
+# Esperado: 401 Unauthorized
+# Detalle: Falta cookie de sesión access_token o credenciales no provistas
+
+
+### 2. Iniciar sesión como VENDEDOR
+# @name loginVendedor
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "vendedor@example.com",
+  "password": "Secreto1234!"
+}
+
+# Esperado: 200 OK
+# Set-Cookie: access_token=...; HttpOnly; SameSite=Lax; Path=/
+
+
+### 3. POST /libros con cookie de VENDEDOR (requiere rol ADMIN)
+# @no-cookie-jar
+POST {{base}}/libros
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{
+  "isbn": "978-950-00-0006-6",
+  "titulo": "Los que aman, odian",
+  "precio": "21000.00",
+  "stock_inicial": 4,
+  "editorial_id": 1,
+  "genero_id": 1,
+  "autores": [
+    { "autor_id": 3, "rol": "coautor", "orden": 1 },
+    { "autor_id": 4, "rol": "coautor", "orden": 2 }
+  ]
+}
+
+# Esperado: 403 Forbidden
+# Detalle: El rol 'VENDEDOR' no tiene permisos para crear libros (requiere 'ADMIN')
+
+
+### 4. Iniciar sesión como ADMIN
+# @name loginAdmin
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "Secreto1234!"
+}
+
+# Esperado: 200 OK
+# Set-Cookie: access_token=...; HttpOnly; SameSite=Lax; Path=/
+
+
+### 5. POST /libros con cookie de ADMIN (pasa el guarda de rol)
+# @no-cookie-jar
+POST {{base}}/libros
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{
+  "isbn": "978-950-00-0006-6",
+  "titulo": "Los que aman, odian",
+  "precio": "21000.00",
+  "stock_inicial": 4,
+  "editorial_id": 1,
+  "genero_id": 1,
+  "autores": [
+    { "autor_id": 3, "rol": "coautor", "orden": 1 },
+    { "autor_id": 4, "rol": "coautor", "orden": 2 }
+  ]
+}
+
+# Esperado: 201 Created (o respuesta funcional de CH-06 con stock inicial)
+
+
+### 6. Iniciar sesión como CLIENTE (Ana Paz)
+# @name loginAna
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "ana@example.com",
+  "password": "Secreto1234!"
+}
+
+# Esperado: 200 OK
+# Set-Cookie: access_token=...; HttpOnly; SameSite=Lax; Path=/
+
+
+### 7. GET /ventas con sesión de CLIENTE (requiere VENDEDOR o ADMIN)
+# @no-cookie-jar
+GET {{base}}/ventas
+Cookie: {{loginAna.response.headers.Set-Cookie}}
+
+# Esperado: 403 Forbidden
+# Una cliente no puede listar el historial general de ventas de la librería
+
+
+### 8. GET /clientes/{id}/ventas de otro cliente con sesión de CLIENTE (RN-14)
+# @no-cookie-jar
+GET {{base}}/clientes/1/ventas
+Cookie: {{loginAna.response.headers.Set-Cookie}}
+
+# Esperado: 403 Forbidden (solo staff o dueño pueden ver las ventas)
+
+
+### 9. Usuario desactivado en la base de datos (activo = false)
+# Simular desactivación ejecutando en psql / python:
+# UPDATE usuario SET activo = false WHERE email = 'vendedor@example.com';
+# Petición a ruta protegida con la cookie previamente emitida al vendedor:
+# @no-cookie-jar
+GET {{base}}/auth/yo
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}
+
+# Esperado: 401 Unauthorized
+# Detalle: get_usuario_actual comprueba 'activo == True' en cada petición en la BD.
+# Si el usuario fue dado de baja o desactivado, responde 401 inmediatamente.

@@ -420,7 +420,7 @@ CH-03 queda fuera del camino crítico (independiente). CH-04, CH-05, CH-08, CH-0
 # PARTE 3 — Autenticación (Persona 3)
 
 ### [CH-07] `security-login-cookie`
-- **Estado**: `[ ]` pendiente
+- **Estado**: `[x]` hecho (archivado 05/11/2026 en `openspec/changes/archive/2026-11-05-ch-07-security-login-cookie/`)
 - **Objetivo**: bcrypt fuera del bucle, JWT y login con cookie, anti-enumeración con hash ficticio.
 - **Entra**:
   - `app/core/security.py`: `hashear_password` / `verificar_password` con `asyncio.to_thread` y **semáforo** (limita cuántos bcrypt corren a la vez), costo = `BCRYPT_COSTO`; `crear_token(sub, roles)` y `decodificar_token` con PyJWT (claims `sub`, `exp`, roles vigentes al emitir; firmado con `JWT_SECRET`, duración `JWT_MINUTOS`).
@@ -495,7 +495,7 @@ CH-03 queda fuera del camino crítico (independiente). CH-04, CH-05, CH-08, CH-0
   - `knowledge-base/09_decisiones_y_supuestos.md` (DD-08, DD-18)
 
 ### [CH-09] `intento-acceso-limite-429`
-- **Estado**: `[ ]` pendiente
+- **Estado**: [x] hecho (archivado 05/11/2026 en openspec/changes/archive/2026-11-05-ch-09-intento-acceso-limite-429/)
 - **Objetivo**: anotar cada intento de login en sesión propia y limitar a 5 fallos por minuto (RN-07).
 - **Entra**:
   - `IntentoAccesoRepository` y una función `registrar_intento(session_factory, email, ip, exito)` que abre **su propia sesión y transacción** y **siempre confirma** (la fábrica sale de `app.state`). Es la **única** escritura que no comparte la transacción de la petición. Va con **un comentario que dice tres cosas**: (1) qué hace distinto, (2) por qué no puede compartir la transacción (el fallo que se cuenta es el mismo que la revierte), (3) su costo (deja filas aunque la petición falle).
@@ -529,7 +529,7 @@ CH-03 queda fuera del camino crítico (independiente). CH-04, CH-05, CH-08, CH-0
 # PARTE 4 — Autorización (Persona 4)
 
 ### [CH-10] `usuario-actual-roles-dos-grupos`
-- **Estado**: `[ ]` pendiente
+- **Estado**: [x] completado
 - **Objetivo**: saber quién es el usuario, qué roles vigentes tiene en la base, y montar los dos grupos de rutas.
 - **Entra**:
   - `app/core/dependencies.py`:
@@ -567,7 +567,7 @@ CH-03 queda fuera del camino crítico (independiente). CH-04, CH-05, CH-08, CH-0
   - `knowledge-base/11_endpoints_y_casos_de_prueba.md` (los tres grupos de rutas)
 
 ### [CH-11] `cambiar-password-cambio-obligatorio`
-- **Estado**: `[ ]` pendiente
+- **Estado**: [x] completado
 - **Objetivo**: cambio de contraseña con auditoría y desbloqueo del cambio obligatorio.
 - **Entra**:
   - `POST /auth/cambiar-password` (`password_actual` y `password_nueva`, **ambas de tipo `PasswordBcrypt`** de CH-07, sin validación propia; `extra="forbid"`) → 200, 401 (sin sesión **o `password_actual` incorrecta**, mismo criterio que el login; DD-30), 422 (cuerpo que rompe el contrato). Ambos hashes/verificaciones se hacen **antes** de abrir la transacción.
@@ -602,7 +602,7 @@ CH-03 queda fuera del camino crítico (independiente). CH-04, CH-05, CH-08, CH-0
   - `knowledge-base/09_decisiones_y_supuestos.md` (DD-30)
 
 ### [CH-12] `roles-vigencia-alta-personal-eventos`
-- **Estado**: `[ ]` pendiente
+- **Estado**: `[x]` completado
 - **Objetivo**: administración de roles con vencimiento, autoprotección (RN-05), alta de personal y consulta del historial de seguridad.
 - **Entra**:
   - `POST /usuarios` (alta de personal con contraseña provisoria de tipo `PasswordBcrypt` de CH-07, sin validación propia; `debe_cambiar_password = true`, rol inicial) → 201, 409, 422. Un solo UoW: usuario + asignación + línea de `evento_seguridad` (RN-16), actor = correo del admin. Hash antes de la transacción.

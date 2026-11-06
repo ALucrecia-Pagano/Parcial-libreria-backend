@@ -1,0 +1,140 @@
+### C-09_cambio_obligatorio.http
+### Caso C-09: Cambio obligatorio de contraseña (RN-06, RN-16, DD-30)
+### Demuestra:
+### - Un usuario con debe_cambiar_password=true solo puede acceder a /auth/* y rutas públicas del grupo abierto.
+### - Cualquier acceso al grupo protegido responde 403 Forbidden.
+### - POST /auth/cambiar-password con contraseña actual incorrecta responde 401 Unauthorized (DD-30).
+### - POST /auth/cambiar-password con contraseña nueva > 72 bytes responde 422 Unprocessable Entity.
+### - POST /auth/cambiar-password exitoso: actualiza el hash, pone debe_cambiar_password=false
+###   y registra en evento_seguridad en la misma transacción (RN-16).
+### - La MISMA cookie de sesión sigue siendo válida inmediatamente y accede al grupo protegido sin reloguearse.
+### Precondición: python seed.py
+
+@base = http://localhost:8000
+
+### 1. Iniciar sesión con usuario que debe cambiar contraseña (nuevo@example.com)
+# @name loginNuevo
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "nuevo@example.com",
+  "password": "Secreto1234!"
+}
+
+# Esperado: 200 OK
+# Set-Cookie: access_token=...; HttpOnly; SameSite=Lax; Path=/
+# Cuerpo: { "mensaje": "Sesión iniciada", "debe_cambiar_password": true, "expira_en_segundos": 1800 }
+
+
+### 2. Acceso a ruta pública del grupo abierto (GET /libros)
+# @no-cookie-jar
+GET {{base}}/libros
+Cookie: {{loginNuevo.response.headers.Set-Cookie}}
+
+# Esperado: 200 OK
+# Las rutas públicas no verifican el cambio obligatorio de contraseña.
+
+
+### 3. Acceso a /auth/yo (permitida en /auth/* para saber estado propio)
+# @no-cookie-jar
+GET {{base}}/auth/yo
+Cookie: {{loginNuevo.response.headers.Set-Cookie}}
+
+# Esperado: 200 OK
+# Cuerpo contiene: "debe_cambiar_password": true
+
+
+### 4. Intento de acceso a ruta protegida (GET /ventas) con cambio pendiente
+# @no-cookie-jar
+GET {{base}}/ventas
+Cookie: {{loginNuevo.response.headers.Set-Cookie}}
+
+# Esperado: 403 Forbidden
+# Detalle: "Debe cambiar su contraseña antes de operar en el sistema" (RN-06)
+# El middleware/dependencia 'exigir_password_al_dia' del grupo protegido bloquea la petición.
+
+
+### 5. Intento de cambiar contraseña sin sesión (sin cookie)
+# @no-cookie-jar
+POST {{base}}/auth/cambiar-password
+Content-Type: application/json
+
+{
+  "password_actual": "Secreto1234!",
+  "password_nueva": "NuevaClave123!"
+}
+
+# Esperado: 401 Unauthorized
+# Requiere estar autenticado con la cookie access_token.
+
+
+### 6. Intento de cambiar contraseña con password_actual INCORRECTA (DD-30)
+# @no-cookie-jar
+POST {{base}}/auth/cambiar-password
+Cookie: {{loginNuevo.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{
+  "password_actual": "ClaveEquivocada123!",
+  "password_nueva": "NuevaClave123!"
+}
+
+# Esperado: 401 Unauthorized
+# Detalle: "Contraseña actual incorrecta" (DD-30: 401, mismo criterio que el login; no 422).
+# La contraseña NO cambia y debe_cambiar_password sigue en true.
+
+
+### 7. Intento de cambio con password_nueva superior a 72 bytes UTF-8
+# @no-cookie-jar
+POST {{base}}/auth/cambiar-password
+Cookie: {{loginNuevo.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{
+  "password_actual": "Secreto1234!",
+  "password_nueva": "EstaPasswordTieneMuchosMasDeSetentaYDosBytesEnUtf8ParaValidarElRechazoStrictDelContratoPasswordBcrypt1234567890"
+}
+
+# Esperado: 422 Unprocessable Entity
+# Contrato PasswordBcrypt valida máximo 72 bytes UTF-8.
+
+
+### 8. Cambio obligatorio exitoso de contraseña
+# @no-cookie-jar
+POST {{base}}/auth/cambiar-password
+Cookie: {{loginNuevo.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{
+  "password_actual": "Secreto1234!",
+  "password_nueva": "NuevaClaveSegura123!"
+}
+
+# Esperado: 200 OK
+# Mensaje: "Contraseña actualizada correctamente"
+# En un solo UoW: actualiza password_hash, debe_cambiar_password = false
+# y escribe en evento_seguridad: actor="nuevo@example.com", accion="Cambio de contraseña" (RN-16).
+
+
+### 9. Consulta a GET /auth/yo con la MISMA cookie original
+# @no-cookie-jar
+GET {{base}}/auth/yo
+Cookie: {{loginNuevo.response.headers.Set-Cookie}}
+
+# Esperado: 200 OK
+# Cuerpo contiene ahora: "debe_cambiar_password": false
+
+
+### 10. Acceso a la ruta protegida GET /ventas con la MISMA cookie original
+# @no-cookie-jar
+GET {{base}}/ventas
+Cookie: {{loginNuevo.response.headers.Set-Cookie}}
+
+# Esperado: 200 OK (o respuesta de lista de ventas para VENDEDOR)
+# No requirió un nuevo login: el levantamiento del flag en la base desbloquea la sesión de inmediato.
+
+
+### Verificación SQL de auditoría (RN-16):
+# SELECT actor, accion, cuando FROM evento_seguridad WHERE actor = 'nuevo@example.com';
+# Retorna 1 fila con accion = 'Cambio de contraseña' registrada en la misma transacción.

@@ -1,0 +1,160 @@
+### C-07_revocar_rol.http
+### Caso C-07: Revocación de rol con sesión abierta y validación de vigencia
+### Demuestra:
+### - RN-04: La autorización se decide en la base en cada petición, no en el token.
+### - Al revocar el rol VENDEDOR a un usuario con sesión iniciada, su MISMA cookie
+###   pasa a recibir 403 Forbidden en la petición inmediatamente posterior.
+### - GET /auth/yo muestra la discrepancia entre roles del token (informativos) y roles vigentes en la base.
+### - GET /usuarios/{id}/roles conserva la fila con revocada_en (historial, sin borrado físico).
+### - POST /usuarios/{id}/roles valida vence_en: zona horaria obligatoria y fecha futura (422),
+###   y unicidad de rol abierto (409 por uq_asignacion_rol_abierta).
+### Precondición: python seed.py
+
+@base = http://localhost:8000
+
+### 1. Iniciar sesión como VENDEDOR (usuario_id = 3 en seed)
+# @name loginVendedor
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "vendedor@example.com",
+  "password": "Secreto1234!"
+}
+
+# Esperado: 200 OK
+# Set-Cookie: access_token=...; HttpOnly; SameSite=Lax; Path=/
+
+
+### 2. Vendedor realiza operación permitida para staff (POST /clientes)
+# @no-cookie-jar
+POST {{base}}/clientes
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{
+  "nombre": "Cliente Prueba C07",
+  "email": "cliente_c07@example.com"
+}
+
+# Esperado: 201 Created (o 200 funcional)
+# El vendedor tiene rol VENDEDOR vigente en la base y puede registrar clientes.
+
+
+### 3. Iniciar sesión como ADMIN (usuario_id = 1 en seed)
+# @name loginAdmin
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "Secreto1234!"
+}
+
+# Esperado: 200 OK
+# Set-Cookie: access_token=...; HttpOnly; SameSite=Lax; Path=/
+
+
+### 4. ADMIN revoca el rol VENDEDOR al usuario 3 (DELETE /usuarios/{id}/roles/{rol})
+# @no-cookie-jar
+DELETE {{base}}/usuarios/3/roles/VENDEDOR
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
+
+# Esperado: 200 OK
+# Mensaje: "Rol revocado correctamente"
+# La fila no se elimina: se marca revocada_en = ahora() y se audita en evento_seguridad (RN-16).
+
+
+### 5. El VENDEDOR intenta nuevamente POST /clientes con su MISMA cookie sin reautenticarse
+# @no-cookie-jar
+POST {{base}}/clientes
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{
+  "nombre": "Cliente Rechazado",
+  "email": "rechazado@example.com"
+}
+
+# Esperado: 403 Forbidden
+# La cookie sigue siendo válida criptográficamente, pero en la BD ya no tiene el rol VENDEDOR vigente (RN-04).
+
+
+### 6. GET /auth/yo del vendedor con su cookie original
+# @no-cookie-jar
+GET {{base}}/auth/yo
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}
+
+# Esperado: 200 OK
+# Demuestra la diferencia:
+# - roles en el token (informativo para UI): ["VENDEDOR"]
+# - roles vigentes en la BD (fuente de autorización): []
+
+
+### 7. ADMIN consulta historial de roles del usuario 3 (GET /usuarios/{id}/roles)
+# @no-cookie-jar
+GET {{base}}/usuarios/3/roles
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
+
+# Esperado: 200 OK
+# Retorna lista donde la asignación del rol VENDEDOR está presente con revocada_en != null
+
+
+### 8. Intento de asignar rol con vence_en en el PASADO
+# @no-cookie-jar
+POST {{base}}/usuarios/3/roles
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{
+  "rol": "VENDEDOR",
+  "vence_en": "2020-01-01T00:00:00Z"
+}
+
+# Esperado: 422 Unprocessable Entity
+# La fecha de vencimiento debe estar en el futuro.
+
+
+### 9. Intento de asignar rol con vence_en SIN ZONA HORARIA
+# @no-cookie-jar
+POST {{base}}/usuarios/3/roles
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{
+  "rol": "VENDEDOR",
+  "vence_en": "2030-01-01T00:00:00"
+}
+
+# Esperado: 422 Unprocessable Entity
+# vence_en debe incluir offset o zona horaria explícita (ISO 8601 con tzinfo).
+
+
+### 10. Asignación válida de nuevo rol VENDEDOR con vencimiento futuro
+# @no-cookie-jar
+POST {{base}}/usuarios/3/roles
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{
+  "rol": "VENDEDOR",
+  "vence_en": "2030-12-31T23:59:59Z"
+}
+
+# Esperado: 201 Created
+# Crea una nueva fila en asignacion_rol con otorgada_por = 1 y audita en evento_seguridad.
+
+
+### 11. Intento de asignar el MISMO rol cuando ya existe una asignación abierta (RN-03)
+# @no-cookie-jar
+POST {{base}}/usuarios/3/roles
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{
+  "rol": "VENDEDOR",
+  "vence_en": "2031-12-31T23:59:59Z"
+}
+
+# Esperado: 409 Conflict
+# Detalle traducido desde uq_asignacion_rol_abierta: "El usuario ya tiene ese rol activo asignado"
