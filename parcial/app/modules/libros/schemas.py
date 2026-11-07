@@ -55,6 +55,10 @@ class LibroUpdate(SQLModel):
         return self
 
 
+class AutoriaRead(AutoriaCreate):
+    autor: AutorRead
+
+
 class LibroRead(SQLModel):
     id: int
     isbn: str
@@ -65,14 +69,11 @@ class LibroRead(SQLModel):
     genero_id: int | None
     editorial: EditorialRead
     genero: GeneroRead | None
-
-
-class AutoriaRead(AutoriaCreate):
-    autor: AutorRead
+    autores: list[AutoriaRead] = Field(default_factory=list, validation_alias="autorias")
 
 
 class LibroDetalleRead(LibroRead):
-    autores: list[AutoriaRead] = Field(validation_alias="autorias")
+    pass
 
 
 class ReponerIn(SQLModel):

@@ -42,61 +42,46 @@ app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
 
 def _asegurar_sin_trailing_slash(router: APIRouter) -> None:
     """Permite que las peticiones sin barra final ('/recurso') y con barra ('/recurso/')
-    funcionen indistintamente sin provocar redirecciones 307."""
+    funcionen indistintamente sin provocar redirecciones 307.
+
+    La clave es path + método: GET y POST del mismo path tienen que duplicarse los dos.
+    """
     rutas_extra = []
-    paths_existentes = {getattr(r, "path", None) for r in router.routes}
-    for r in list(router.routes):
+    firmas = set()
+    for r in router.routes:
         if isinstance(r, APIRoute):
-            if r.path.endswith("/") and r.path != "/":
-                sin_barra = r.path.rstrip("/")
-                if sin_barra not in paths_existentes:
-                    rutas_extra.append(
-                        APIRoute(
-                            path=sin_barra,
-                            endpoint=r.endpoint,
-                            methods=r.methods,
-                            response_model=r.response_model,
-                            status_code=r.status_code,
-                            dependencies=r.dependencies,
-                            summary=r.summary,
-                            description=r.description,
-                            tags=r.tags,
-                        )
-                    )
-                    paths_existentes.add(sin_barra)
-            elif r.path == "/":
-                if "" not in paths_existentes:
-                    rutas_extra.append(
-                        APIRoute(
-                            path="",
-                            endpoint=r.endpoint,
-                            methods=r.methods,
-                            response_model=r.response_model,
-                            status_code=r.status_code,
-                            dependencies=r.dependencies,
-                            summary=r.summary,
-                            description=r.description,
-                            tags=r.tags,
-                        )
-                    )
-                    paths_existentes.add("")
-            elif not r.path.endswith("/"):
-                con_barra = r.path + "/"
-                if con_barra not in paths_existentes:
-                    rutas_extra.append(
-                        APIRoute(
-                            path=con_barra,
-                            endpoint=r.endpoint,
-                            methods=r.methods,
-                            response_model=r.response_model,
-                            status_code=r.status_code,
-                            dependencies=r.dependencies,
-                            summary=r.summary,
-                            description=r.description,
-                            tags=r.tags,
-                        )
-                    )
-                    paths_existentes.add(con_barra)
+            for metodo in r.methods or []:
+                firmas.add((r.path, metodo))
+
+    def _copiar(ruta: APIRoute, path: str) -> None:
+        metodos_nuevos = {m for m in (ruta.methods or []) if (path, m) not in firmas}
+        if not metodos_nuevos:
+            return
+        rutas_extra.append(
+            APIRoute(
+                path=path,
+                endpoint=ruta.endpoint,
+                methods=metodos_nuevos,
+                response_model=ruta.response_model,
+                status_code=ruta.status_code,
+                dependencies=ruta.dependencies,
+                summary=ruta.summary,
+                description=ruta.description,
+                tags=ruta.tags,
+            )
+        )
+        for metodo in metodos_nuevos:
+            firmas.add((path, metodo))
+
+    for r in list(router.routes):
+        if not isinstance(r, APIRoute):
+            continue
+        if r.path.endswith("/") and r.path != "/":
+            _copiar(r, r.path.rstrip("/"))
+        elif r.path == "/":
+            _copiar(r, "")
+        elif not r.path.endswith("/"):
+            _copiar(r, r.path + "/")
     router.routes.extend(rutas_extra)
 
 

@@ -645,7 +645,7 @@ CH-03 queda fuera del camino crítico (independiente). CH-04, CH-05, CH-08, CH-0
 # PARTE 5 — Clientes y ventas (Persona 5)
 
 ### [CH-13] `clientes-repo-uow-usuario-id`
-- **Estado**: `[ ]` pendiente
+- **Estado**: `[x]` hecho (archivado 07/11/2026 en `openspec/changes/archive/2026-11-07-ch-13-clientes-repo-uow-usuario-id/`)
 - **Objetivo**: clientes con repositorio + UoW, ficha vinculable a un usuario, y rutas para VENDEDOR o ADMIN.
 - **Entra**:
   - `clientes/repository.py` (`ClienteRepository` con `get_by_email`, `get_by_usuario_id`, precarga del perfil declarada adentro; `PerfilClienteRepository`), `unit_of_work.py`, `service.py` (recibe el UoW), `router.py` (`router_staff`).
@@ -680,7 +680,7 @@ CH-03 queda fuera del camino crítico (independiente). CH-04, CH-05, CH-08, CH-0
   - `knowledge-base/05_reglas_de_negocio.md` (RN-01, RN-14)
 
 ### [CH-14] `venta-rn10-mis-ventas-dueno`
-- **Estado**: `[ ]` pendiente
+- **Estado**: `[x]` hecho (archivado 07/11/2026 en `openspec/changes/archive/2026-11-07-ch-14-venta-rn10-mis-ventas-dueno/`)
 - **Objetivo**: registrar una venta de forma atómica usando el punto único de stock, y exponer las lecturas "lo propio".
 - **Entra**:
   - `ventas/repository.py`, `ventas/unit_of_work.py` (ventas, renglones, libros, movimientos, clientes con `BaseRepository(session, Cliente)` genérico), `service.py`, `router.py`.
@@ -719,7 +719,7 @@ CH-03 queda fuera del camino crítico (independiente). CH-04, CH-05, CH-08, CH-0
   - `knowledge-base/03_actores_y_roles.md` (nota sobre `GET /ventas/{id}`)
 
 ### [CH-15] `sin-n-mas-1-background-solo-agregado`
-- **Estado**: `[ ]` pendiente
+- **Estado**: `[x]` hecho (archivado 07/11/2026 en `openspec/changes/archive/2026-11-07-ch-15-sin-n-mas-1-background-solo-agregado/`)
 - **Objetivo**: lecturas con número fijo de consultas, aviso visible, evidencia de C-14 y C-15 y cierre del README.
 - **Entra**:
   - Carga anticipada **declarada en los repositorios** (`selectinload`/`joinedload`) para: detalle de venta (cliente, renglones, libro de cada renglón **incluso dado de baja**), listados de libros (autores, editorial, género), clientes (perfil) y movimientos. Ninguna lectura depende de carga perezosa. El detalle usa un **número fijo de consultas** que no crece con los renglones.

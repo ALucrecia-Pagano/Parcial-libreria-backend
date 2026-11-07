@@ -1,4 +1,6 @@
-# TP Librería — FastAPI + PostgreSQL (UTN Programación III, Unid. 1–4)
+# TP Librería — FastAPI + PostgreSQL (UTN Programación III)
+
+Integrantes: Pagano Amanda, Liendo Mateo, Avila Lucas, Valentini Tiziano, García Juan.
 
 Avance por ejercicio de la consigna. `[X]` = completado y verificado, `[]` = pendiente.
 
@@ -40,6 +42,8 @@ Pasos para Windows con Git Bash (Python 3.12 o superior y PostgreSQL instalados)
    ```
 9. Abrí http://localhost:8000/docs
 10. Sobre una base migrada, ejecutá `python seed.py` desde `parcial/` antes de probar los endpoints. El script vacía todas las tablas con `TRUNCATE ... RESTART IDENTITY CASCADE` y carga los datos iniciales, así que se puede correr más de una vez. La venta 1, de Lucía Fernández, totaliza `69000.00` (1 × Rayuela + 2 × Ficciones).
+
+El seed del parcial no es el del TP. En `despliegue/` el comando sigue siendo `python -m scripts.seed`: no trunca una base con datos y la venta de ejemplo totaliza `71000.00`. En `parcial/` `python seed.py` sí vacía las tablas, deja la venta 1 en `69000.00` y además carga usuarios, roles y los movimientos de stock.
 
 ### Datos iniciales (`seed.py`)
 

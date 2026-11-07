@@ -1,0 +1,62 @@
+# C-15 · El detalle de una venta no hace N+1
+# Antes: python seed.py
+# Levantar la API con SQL_ECHO=true.
+# Una venta de 2 renglones y otra de 4 tienen que mostrar la MISMA cantidad
+# de SELECT en la consola (el detalle no crece con los renglones).
+# Guardar esa consola en parcial/evidencia/.
+
+@base = http://localhost:8000
+
+### 0. Login del vendedor
+# esperado: 200
+# @name loginVendedor
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "email": "vendedor@example.com", "password": "Secreto1234!" }
+
+### 1. Venta de 2 renglones (Rayuela y Ficciones)
+# esperado: 201
+# @no-cookie-jar
+POST {{base}}/ventas
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{
+  "cliente_id": 1,
+  "renglones": [
+    { "libro_id": 1, "cantidad": 1 },
+    { "libro_id": 3, "cantidad": 1 }
+  ]
+}
+
+### 2. Venta de 4 renglones
+# esperado: 201
+# @no-cookie-jar
+POST {{base}}/ventas
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{
+  "cliente_id": 2,
+  "renglones": [
+    { "libro_id": 1, "cantidad": 1 },
+    { "libro_id": 2, "cantidad": 1 },
+    { "libro_id": 4, "cantidad": 1 },
+    { "libro_id": 5, "cantidad": 1 }
+  ]
+}
+
+### 3. Detalle de la venta de 2 renglones (id 2: la 1 es la del seed)
+# esperado: 200, dos renglones, con el título de cada libro
+# Anotar cuántos SELECT imprime la consola.
+# @no-cookie-jar
+GET {{base}}/ventas/2
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}
+
+### 4. Detalle de la venta de 4 renglones (id 3)
+# esperado: 200, cuatro renglones
+# La consola imprime la misma cantidad de SELECT que en el pedido 3.
+# @no-cookie-jar
+GET {{base}}/ventas/3
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}

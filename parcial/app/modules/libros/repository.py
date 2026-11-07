@@ -21,6 +21,13 @@ from app.core.repository import BaseRepository, SoftDeleteRepository
 from app.modules.libros.models import Libro, LibroAutor, MovimientoStock
 
 
+_OPCIONES_LISTADO = (
+    joinedload(Libro.editorial),
+    joinedload(Libro.genero),
+    selectinload(Libro.autorias).joinedload(LibroAutor.autor),
+)
+
+
 class LibroRepository(SoftDeleteRepository[Libro]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, Libro)
@@ -46,11 +53,11 @@ class LibroRepository(SoftDeleteRepository[Libro]):
     async def listar_catalogo(
         self, offset: int, limit: int, titulo: str | None = None, genero_id: int | None = None
     ) -> Sequence[Libro]:
-        """Libros vigentes de una página, con editorial y género precargados."""
+        """Libros vigentes de una página, con editorial, género y autores precargados."""
         consulta = (
             select(Libro)
             .where(*self._filtros_catalogo(titulo, genero_id))
-            .options(joinedload(Libro.editorial), joinedload(Libro.genero))
+            .options(*_OPCIONES_LISTADO)
             .order_by(Libro.id)
             .offset(offset)
             .limit(limit)
@@ -86,7 +93,7 @@ class LibroRepository(SoftDeleteRepository[Libro]):
             select(Libro)
             .join(LibroAutor, LibroAutor.libro_id == Libro.id)
             .where(LibroAutor.autor_id == autor_id, Libro.borrado_en.is_(None))
-            .options(joinedload(Libro.editorial), joinedload(Libro.genero))
+            .options(*_OPCIONES_LISTADO)
             .order_by(Libro.id)
         )
         return (await self.session.scalars(consulta)).all()
@@ -95,7 +102,7 @@ class LibroRepository(SoftDeleteRepository[Libro]):
         consulta = (
             select(Libro)
             .where(condicion, Libro.borrado_en.is_(None))
-            .options(joinedload(Libro.editorial), joinedload(Libro.genero))
+            .options(*_OPCIONES_LISTADO)
             .order_by(Libro.id)
         )
         return (await self.session.scalars(consulta)).all()

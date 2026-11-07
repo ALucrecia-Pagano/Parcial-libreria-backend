@@ -38,3 +38,10 @@ Catálogo público de libros con baja lógica: solo los vigentes se listan, se b
 #### Scenario: Género inexistente
 - **WHEN** se pide `GET /generos/9999/libros`
 - **THEN** responde 404 con mensaje propio
+
+### Requirement: Listado con relaciones precargadas
+`GET /libros` SHALL incluir, en cada ítem, la editorial, el género y los autores del libro, obtenidos con carga anticipada declarada en el repositorio. La lectura SHALL NOT depender de la carga perezosa.
+
+#### Scenario: Un ítem del catálogo
+- **WHEN** se pide `GET /libros` con los datos iniciales
+- **THEN** responde 200 y cada libro trae su editorial, su género y su lista de autores

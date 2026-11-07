@@ -1,0 +1,12 @@
+C-14. psql contra la base libreria, sentencias de parcial/test/solo_agregado.sql.
+2026-11-07.
+
+UPDATE movimiento_stock SET cantidad = cantidad WHERE id = 1;
+ERROR:  movimiento_stock es de sólo agregado: no se permite UPDATE sobre sus filas (RN-12)
+CONTEXTO:  función PL/pgSQL rechazar_modificacion_movimiento_stock() en la línea 3 en RAISE
+
+DELETE FROM movimiento_stock WHERE id = 1;
+ERROR:  movimiento_stock es de sólo agregado: no se permite DELETE sobre sus filas (RN-12)
+CONTEXTO:  función PL/pgSQL rechazar_modificacion_movimiento_stock() en la línea 3 en RAISE
+
+Ninguna de las dos dejó cambios.

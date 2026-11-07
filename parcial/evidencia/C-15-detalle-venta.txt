@@ -1,0 +1,22 @@
+C-15. Detalle de venta con SQL_ECHO=true. 2026-11-07.
+API: uvicorn app.main:app en http://127.0.0.1:8000, después de python seed.py.
+
+GET /ventas/2 (2 renglones) — 4 SELECT, luego 200:
+SELECT usuario ... WHERE usuario.id = $1
+SELECT venta ... LEFT OUTER JOIN cliente ... WHERE venta.id = $1
+SELECT renglon_venta ... LEFT OUTER JOIN libro ... WHERE renglon_venta.venta_id IN ($1)
+SELECT asignacion_rol.rol ... WHERE asignacion_rol.usuario_id = $1
+INFO: 127.0.0.1 - "GET /ventas/2 HTTP/1.1" 200 OK
+
+GET /ventas/3 (4 renglones) — los mismos 4 SELECT, luego 200:
+SELECT usuario ... WHERE usuario.id = $1
+SELECT venta ... LEFT OUTER JOIN cliente ... WHERE venta.id = $1
+SELECT renglon_venta ... LEFT OUTER JOIN libro ... WHERE renglon_venta.venta_id IN ($1)
+SELECT asignacion_rol.rol ... WHERE asignacion_rol.usuario_id = $1
+INFO: 127.0.0.1 - "GET /ventas/3 HTTP/1.1" 200 OK
+
+La consulta de renglones es una sola (IN con el id de la venta) y une el libro,
+también si estuviera dado de baja. No aparece un SELECT por renglón.
+El aviso del comprobante salió en la consola después de cada POST /ventas 201:
+INFO: Comprobante de venta 2 enviado a lucia@example.com (simulado)
+INFO: Comprobante de venta 3 enviado a tomas@example.com (simulado)
