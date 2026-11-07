@@ -1,79 +1,52 @@
-"""Lógica del módulo clientes y traducción de errores de la base."""
+"""Reglas del módulo clientes.
 
-from typing import Sequence
-
+Cada función recibe el Unit of Work y lo abre. El correo repetido y el perfil
+duplicado los rechaza la base: el IntegrityError sale del bloque, el Unit of
+Work revierte y el router lo traduce a 409. No hay consulta previa de unicidad.
+"""
 from fastapi import HTTPException, status
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
-from sqlmodel import select
 
 from app.modules.clientes.models import Cliente, PerfilCliente
 from app.modules.clientes.schemas import ClienteCreate, ClienteUpdate, PerfilCreate
-from app.modules.ventas.models import Venta
+from app.modules.clientes.unit_of_work import ClientesUnitOfWork
 
 
-async def list_clientes(session: AsyncSession, limit: int, offset: int) -> Sequence[Cliente]:
-    consulta = (
-        select(Cliente).options(joinedload(Cliente.perfil))
-        .order_by(Cliente.id).limit(limit).offset(offset)
-    )
-    result = await session.execute(consulta)
-    return result.scalars().all()
+async def obtener(uow: ClientesUnitOfWork, cliente_id: int) -> Cliente:
+    async with uow:
+        return await _buscar(uow, cliente_id)
 
 
-async def get_cliente(session: AsyncSession, cliente_id: int) -> Cliente:
-    consulta = (
-        select(Cliente).where(Cliente.id == cliente_id)
-        .options(joinedload(Cliente.perfil))
-    )
-    result = await session.execute(consulta)
-    cliente = result.scalars().first()
+async def crear(uow: ClientesUnitOfWork, datos: ClienteCreate) -> Cliente:
+    async with uow:
+        cliente = await uow.clientes.add(
+            Cliente(nombre=datos.nombre, email=datos.email)
+        )
+        return await _buscar(uow, cliente.id)
+
+
+async def actualizar(
+    uow: ClientesUnitOfWork, cliente_id: int, datos: ClienteUpdate
+) -> Cliente:
+    async with uow:
+        cliente = await _buscar(uow, cliente_id)
+        await uow.clientes.update(cliente, datos.model_dump(exclude_unset=True))
+        return await _buscar(uow, cliente_id)
+
+
+async def crear_perfil(
+    uow: ClientesUnitOfWork, cliente_id: int, datos: PerfilCreate
+) -> PerfilCliente:
+    async with uow:
+        await _buscar(uow, cliente_id)
+        return await uow.perfiles.add(
+            PerfilCliente(cliente_id=cliente_id, **datos.model_dump())
+        )
+
+
+async def _buscar(uow: ClientesUnitOfWork, cliente_id: int) -> Cliente:
+    cliente = await uow.clientes.get_con_perfil(cliente_id)
     if cliente is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente no encontrado")
-    return cliente
-
-
-async def create_cliente(session: AsyncSession, data: ClienteCreate) -> Cliente:
-    cliente = Cliente.model_validate(data)
-    session.add(cliente)
-    await _guardar(session, "Ya existe un cliente con ese email")
-    return await get_cliente(session, cliente.id)
-
-
-async def update_cliente(session: AsyncSession, cliente_id: int, data: ClienteUpdate) -> Cliente:
-    cliente = await get_cliente(session, cliente_id)
-    for campo, valor in data.model_dump(exclude_unset=True).items():
-        setattr(cliente, campo, valor)
-    await _guardar(session, "No se pudo actualizar el cliente: email repetido o datos inválidos")
-    return cliente
-
-
-async def create_perfil(session: AsyncSession, cliente_id: int, data: PerfilCreate) -> PerfilCliente:
-    await get_cliente(session, cliente_id)
-    perfil = PerfilCliente(cliente_id=cliente_id, **data.model_dump())
-    session.add(perfil)
-    await _guardar(session, "El cliente ya tiene un perfil")
-    return perfil
-
-
-async def list_ventas_cliente(
-    session: AsyncSession, cliente_id: int, limit: int, offset: int
-) -> Sequence[Venta]:
-    await get_cliente(session, cliente_id)
-    consulta = (
-        select(Venta).where(Venta.cliente_id == cliente_id)
-        .order_by(Venta.id).limit(limit).offset(offset)
-    )
-    result = await session.execute(consulta)
-    return result.scalars().all()
-
-
-async def _guardar(session: AsyncSession, mensaje_conflicto: str) -> None:
-    try:
-        await session.commit()
-    except IntegrityError:
-        await session.rollback()
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=mensaje_conflicto
-        ) from None
+            status_code=status.HTTP_404_NOT_FOUND, detail="Cliente no encontrado"
+        )
+    return cliente

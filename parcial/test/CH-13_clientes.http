@@ -1,0 +1,137 @@
+# CH-13 · Clientes con repositorio + Unit of Work y usuario_id no editable
+# Antes de correr este archivo: python seed.py
+# Sesión de vendedor@example.com (contraseña: PASSWORD_SEED de seed.py).
+# Correr los pedidos EN ORDEN.
+
+@base = http://localhost:8000
+
+### 0. Login del vendedor
+# esperado: 200 y Set-Cookie: access_token=...; HttpOnly
+# @name loginVendedor
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "email": "vendedor@example.com", "password": "Secreto1234!" }
+
+### 1. Alta de cliente
+# esperado: 201 con usuario_id null y sin perfil
+# @no-cookie-jar
+POST {{base}}/clientes
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{ "nombre": "Cliente CH13", "email": "ch13@example.com" }
+
+### 2. Mismo correo
+# esperado: 409 {"detail":"Ya existe un cliente con ese email"}
+# @no-cookie-jar
+POST {{base}}/clientes
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{ "nombre": "Otro", "email": "ch13@example.com" }
+
+### 3. usuario_id en el cuerpo
+# esperado: 422 extra_forbidden
+# @no-cookie-jar
+POST {{base}}/clientes
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{ "nombre": "Con usuario", "email": "con-usuario@example.com", "usuario_id": 4 }
+
+### 4. Sin nombre
+# esperado: 422
+# @no-cookie-jar
+POST {{base}}/clientes
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{ "email": "sin-nombre@example.com" }
+
+### 5. Lucía: perfil y sin usuario
+# esperado: 200, nombre Lucía Fernández, usuario_id null, perfil presente
+# @no-cookie-jar
+GET {{base}}/clientes/1
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}
+
+### 6. Ana: con usuario
+# esperado: 200, usuario_id 4
+# @no-cookie-jar
+GET {{base}}/clientes/3
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}
+
+### 7. Cliente inexistente
+# esperado: 404 {"detail":"Cliente no encontrado"}
+# @no-cookie-jar
+GET {{base}}/clientes/9999
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}
+
+### 8. PATCH parcial de Tomás
+# esperado: 200, nombre "Tomás Editado", email sigue tomas@example.com, usuario_id null
+# @no-cookie-jar
+PATCH {{base}}/clientes/2
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{ "nombre": "Tomás Editado" }
+
+### 9. PATCH con el correo de Lucía
+# esperado: 409 {"detail":"Ya existe un cliente con ese email"}
+# @no-cookie-jar
+PATCH {{base}}/clientes/2
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{ "email": "lucia@example.com" }
+
+### 10. Perfil de Tomás
+# esperado: 201
+# @no-cookie-jar
+POST {{base}}/clientes/2/perfil
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{ "telefono": "261-5550002", "direccion": "Las Heras 50" }
+
+### 11. Perfil repetido
+# esperado: 409 {"detail":"El cliente ya tiene un perfil registrado"}
+# @no-cookie-jar
+POST {{base}}/clientes/2/perfil
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{ "telefono": "261-5550002", "direccion": "Otra" }
+
+### 12. Perfil de cliente inexistente
+# esperado: 404 {"detail":"Cliente no encontrado"}
+# @no-cookie-jar
+POST {{base}}/clientes/9999/perfil
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{ "telefono": "1", "direccion": "x" }
+
+### 13. Sin sesión
+# esperado: 401
+POST {{base}}/clientes
+Content-Type: application/json
+
+{ "nombre": "Nadie", "email": "nadie@example.com" }
+
+### 14. Login de Ana (CLIENTE)
+# esperado: 200
+# @name loginAna
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "email": "ana@example.com", "password": "Secreto1234!" }
+
+### 15. Ana no puede dar de alta clientes
+# esperado: 403
+# @no-cookie-jar
+POST {{base}}/clientes
+Cookie: {{loginAna.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{ "nombre": "Intrusa", "email": "intrusa@example.com" }

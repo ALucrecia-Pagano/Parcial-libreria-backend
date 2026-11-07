@@ -1,56 +1,64 @@
-"""Rutas HTTP del módulo clientes."""
+"""Rutas de clientes para VENDEDOR o ADMIN.
 
-from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy.ext.asyncio import AsyncSession
+El router construye el Unit of Work y no lo abre. La guarda de rol la pone
+main.py al montar router_staff. Las ventas del cliente viven en el módulo ventas.
+"""
+from typing import Annotated
 
-from app.core.database import get_session
+from fastapi import APIRouter, Depends, status
+from sqlalchemy.exc import IntegrityError
+
+from app.core.database import SessionDep
+from app.core.errores import traducir_integrity_error
 from app.modules.clientes import service
 from app.modules.clientes.schemas import (
-    ClienteCreate, ClienteRead, ClienteUpdate, PerfilCreate, PerfilRead,
+    ClienteCreate,
+    ClienteRead,
+    ClienteUpdate,
+    PerfilCreate,
+    PerfilRead,
 )
-from app.modules.ventas.schemas import VentaRead
-
-router = APIRouter(prefix="/clientes", tags=["clientes"])
+from app.modules.clientes.unit_of_work import ClientesUnitOfWork
 
 
-@router.post("/", response_model=ClienteRead, status_code=status.HTTP_201_CREATED)
-async def create(data: ClienteCreate, session: AsyncSession = Depends(get_session)):
-    return await service.create_cliente(session, data)
+def get_uow(session: SessionDep) -> ClientesUnitOfWork:
+    return ClientesUnitOfWork(session)
 
 
-@router.get("/", response_model=list[ClienteRead])
-async def list_all(
-    limit: int = Query(default=20, ge=1, le=100),
-    offset: int = Query(default=0, ge=0),
-    session: AsyncSession = Depends(get_session),
-):
-    return await service.list_clientes(session, limit, offset)
+UowDep = Annotated[ClientesUnitOfWork, Depends(get_uow)]
+
+router_staff = APIRouter(prefix="/clientes", tags=["clientes"])
 
 
-@router.get("/{cliente_id}", response_model=ClienteRead)
-async def get_one(cliente_id: int, session: AsyncSession = Depends(get_session)):
-    return await service.get_cliente(session, cliente_id)
+@router_staff.post("", response_model=ClienteRead, status_code=status.HTTP_201_CREATED)
+async def crear(datos: ClienteCreate, uow: UowDep):
+    try:
+        return await service.crear(uow, datos)
+    except IntegrityError as exc:
+        raise traducir_integrity_error(exc) from None
 
 
-@router.patch("/{cliente_id}", response_model=ClienteRead)
-async def update(
-    cliente_id: int, data: ClienteUpdate, session: AsyncSession = Depends(get_session),
-):
-    return await service.update_cliente(session, cliente_id, data)
+@router_staff.get("/{cliente_id}", response_model=ClienteRead)
+async def obtener(cliente_id: int, uow: UowDep):
+    return await service.obtener(uow, cliente_id)
 
 
-@router.post("/{cliente_id}/perfil", response_model=PerfilRead, status_code=status.HTTP_201_CREATED)
-async def create_perfil(
-    cliente_id: int, data: PerfilCreate, session: AsyncSession = Depends(get_session),
-):
-    return await service.create_perfil(session, cliente_id, data)
+@router_staff.patch("/{cliente_id}", response_model=ClienteRead)
+async def actualizar(cliente_id: int, datos: ClienteUpdate, uow: UowDep):
+    try:
+        return await service.actualizar(uow, cliente_id, datos)
+    except IntegrityError as exc:
+        raise traducir_integrity_error(exc) from None
 
 
-@router.get("/{cliente_id}/ventas", response_model=list[VentaRead])
-async def list_ventas(
-    cliente_id: int,
-    limit: int = Query(default=20, ge=1, le=100),
-    offset: int = Query(default=0, ge=0),
-    session: AsyncSession = Depends(get_session),
-):
-    return await service.list_ventas_cliente(session, cliente_id, limit, offset)
+@router_staff.post(
+    "/{cliente_id}/perfil",
+    response_model=PerfilRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def crear_perfil(cliente_id: int, datos: PerfilCreate, uow: UowDep):
+    try:
+        return await service.crear_perfil(uow, cliente_id, datos)
+    except IntegrityError as exc:
+        raise traducir_integrity_error(exc) from None
+
