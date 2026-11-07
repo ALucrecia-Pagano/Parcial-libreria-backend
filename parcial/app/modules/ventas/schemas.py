@@ -1,18 +1,25 @@
-"""DTOs de entrada y salida del módulo ventas."""
+"""Contratos de ventas.
 
+El alta recibe cliente_id y renglones. Precio, total y fecha no viajan:
+los calcula el servidor. extra="forbid" rechaza esos campos con 422.
+"""
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import field_validator, model_validator
+from pydantic import ConfigDict, field_validator, model_validator
 from sqlmodel import Field, SQLModel
 
 
 class RenglonCreate(SQLModel):
+    model_config = ConfigDict(extra="forbid")
+
     libro_id: int
     cantidad: int = Field(gt=0)
 
 
 class VentaCreate(SQLModel):
+    model_config = ConfigDict(extra="forbid")
+
     cliente_id: int
     renglones: list[RenglonCreate] = Field(min_length=1)
 

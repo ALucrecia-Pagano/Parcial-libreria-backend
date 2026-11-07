@@ -1,32 +1,64 @@
-"""Rutas HTTP del módulo ventas."""
+"""Rutas de ventas.
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
-from sqlalchemy.ext.asyncio import AsyncSession
+router_staff pide VENDEDOR o ADMIN (lo monta main.py).
+router_protegido solo pide sesión: el detalle decide si quien mira es personal o el dueño.
+El aviso del comprobante se agenda después de que el servicio confirmó la venta.
+"""
+from typing import Annotated
 
-from app.core.database import get_session
+from fastapi import APIRouter, BackgroundTasks, Depends, status
+from sqlalchemy.exc import IntegrityError
+
+from app.core.database import SessionDep
+from app.core.dependencies import UsuarioActualDep
+from app.core.errores import traducir_integrity_error
+from app.core.paginacion import Pagina, PaginacionDep
 from app.modules.ventas import service
+from app.modules.ventas.schemas import VentaCreate, VentaDetalleRead, VentaRead
 from app.modules.ventas.tasks import avisar_comprobante
-from app.modules.ventas.schemas import VentaCreate, VentaRead, VentaDetalleRead
-
-router = APIRouter(prefix="/ventas", tags=["ventas"])
+from app.modules.ventas.unit_of_work import VentasUnitOfWork
 
 
-@router.post("/", response_model=VentaDetalleRead, status_code=status.HTTP_201_CREATED)
-async def registrar_venta(venta_in: VentaCreate, background_tasks: BackgroundTasks, session: AsyncSession = Depends(get_session)):
-    venta = await service.crear_venta(session, venta_in)
+def get_uow(session: SessionDep) -> VentasUnitOfWork:
+    return VentasUnitOfWork(session)
+
+
+UowDep = Annotated[VentasUnitOfWork, Depends(get_uow)]
+
+router_staff = APIRouter(tags=["ventas"])
+router_protegido = APIRouter(tags=["ventas"])
+
+
+@router_staff.post("/ventas", response_model=VentaDetalleRead, status_code=status.HTTP_201_CREATED)
+async def registrar(
+    datos: VentaCreate,
+    background_tasks: BackgroundTasks,
+    usuario: UsuarioActualDep,
+    uow: UowDep,
+):
+    try:
+        venta = await service.registrar(uow, datos, usuario.id)
+    except IntegrityError as exc:
+        raise traducir_integrity_error(exc) from None
     background_tasks.add_task(avisar_comprobante, venta.id, venta.cliente.email)
     return venta
 
 
-@router.get("/", response_model=list[VentaRead])
-async def leer_ventas(
-    limit: int = Query(default=20, ge=1, le=100),
-    offset: int = Query(default=0, ge=0),
-    session: AsyncSession = Depends(get_session),
-):
-    return await service.obtener_ventas(session, limit, offset)
+@router_staff.get("/ventas", response_model=Pagina[VentaRead])
+async def listar(uow: UowDep, paginacion: PaginacionDep):
+    return await service.listar(uow, paginacion.page, paginacion.size)
 
 
-@router.get("/{venta_id}", response_model=VentaDetalleRead)
-async def leer_venta_detalle(venta_id: int, session: AsyncSession = Depends(get_session)):
-    return await service.obtener_venta_por_id(session, venta_id)
+@router_staff.get("/clientes/{cliente_id}/ventas", response_model=Pagina[VentaRead])
+async def listar_de_cliente(cliente_id: int, uow: UowDep, paginacion: PaginacionDep):
+    return await service.listar(uow, paginacion.page, paginacion.size, cliente_id)
+
+
+@router_protegido.get("/mis-ventas", response_model=Pagina[VentaRead])
+async def listar_propias(usuario: UsuarioActualDep, uow: UowDep, paginacion: PaginacionDep):
+    return await service.listar_propias(uow, usuario.id, paginacion.page, paginacion.size)
+
+
+@router_protegido.get("/ventas/{venta_id}", response_model=VentaDetalleRead)
+async def obtener(venta_id: int, usuario: UsuarioActualDep, uow: UowDep):
+    return await service.obtener(uow, venta_id, usuario.usuario)

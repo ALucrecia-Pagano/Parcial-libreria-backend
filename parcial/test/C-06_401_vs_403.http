@@ -133,10 +133,51 @@ Cookie: {{loginAna.response.headers.Set-Cookie}}
 GET {{base}}/clientes/1/ventas
 Cookie: {{loginAna.response.headers.Set-Cookie}}
 
-# Esperado: 403 Forbidden (solo staff o dueño pueden ver las ventas)
+# Esperado: 403 Forbidden (solo staff: Ana no es VENDEDOR ni ADMIN)
 
 
-### 9. Usuario desactivado en la base de datos (activo = false)
+### 9. El vendedor registra una venta de Ana (cliente 3)
+# Esperado: 201. Queda como venta 2 si el seed está recién corrido.
+# @no-cookie-jar
+POST {{base}}/ventas
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{
+  "cliente_id": 3,
+  "renglones": [ { "libro_id": 1, "cantidad": 1 } ]
+}
+
+
+### 10. Ana ve su venta
+# Esperado: 200
+# @no-cookie-jar
+GET {{base}}/ventas/2
+Cookie: {{loginAna.response.headers.Set-Cookie}}
+
+
+### 11. Ana no ve la venta de Lucía
+# Esperado: 403 {"detail":"No tenés permiso para ver esta venta"}
+# @no-cookie-jar
+GET {{base}}/ventas/1
+Cookie: {{loginAna.response.headers.Set-Cookie}}
+
+
+### 12. Mis ventas de Ana: solo las suyas
+# Esperado: 200, total 1, el ítem con cliente_id 3
+# @no-cookie-jar
+GET {{base}}/mis-ventas
+Cookie: {{loginAna.response.headers.Set-Cookie}}
+
+
+### 13. Venta inexistente
+# Esperado: 404 {"detail":"Venta no encontrada"}
+# @no-cookie-jar
+GET {{base}}/ventas/9999
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}
+
+
+### 14. Usuario desactivado en la base de datos (activo = false)
 # Simular desactivación ejecutando en psql / python:
 # UPDATE usuario SET activo = false WHERE email = 'vendedor@example.com';
 # Petición a ruta protegida con la cookie previamente emitida al vendedor:

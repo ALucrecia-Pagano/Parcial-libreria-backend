@@ -14,12 +14,20 @@ desde la aplicación: no hay otro camino para tocar el stock.
 - Los movimientos nunca se editan ni se borran (RN-12): además de no haber código
   que lo haga, lo impide el disparador de la migración 4.
 """
+from typing import Protocol
+
 from app.modules.libros.models import Libro, MovimientoStock
-from app.modules.libros.unit_of_work import LibrosUnitOfWork
+from app.modules.libros.repository import MovimientoStockRepository
+
+
+class UowDeMovimientos(Protocol):
+    """Cualquier Unit of Work que escriba stock por el mismo repositorio de movimientos."""
+
+    movimientos: MovimientoStockRepository
 
 
 async def aplicar_movimiento(
-    uow: LibrosUnitOfWork,
+    uow: UowDeMovimientos,
     libro: Libro,
     cantidad: int,
     motivo: str,

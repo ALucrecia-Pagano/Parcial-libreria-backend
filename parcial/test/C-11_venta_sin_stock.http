@@ -1,0 +1,43 @@
+# C-11 · Venta sin stock: no queda nada
+# Antes: python seed.py
+# Rayuela x1 alcanza (stock 10). Bestiario x2 no alcanza (stock 1).
+# Esperado: 409. No hay venta nueva. Rayuela sigue en 10.
+# La suma de movimientos sigue igual al stock en los cinco libros:
+#   SELECT l.id, l.stock, COALESCE(SUM(m.cantidad), 0)
+#   FROM libro l LEFT JOIN movimiento_stock m ON m.libro_id = l.id
+#   GROUP BY l.id, l.stock;
+
+@base = http://localhost:8000
+
+### 0. Login del vendedor
+# esperado: 200
+# @name loginVendedor
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "email": "vendedor@example.com", "password": "Secreto1234!" }
+
+### 1. Venta que no alcanza
+# esperado: 409 {"detail":"El stock del libro no puede quedar negativo"}
+# @no-cookie-jar
+POST {{base}}/ventas
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{
+  "cliente_id": 1,
+  "renglones": [
+    { "libro_id": 1, "cantidad": 1 },
+    { "libro_id": 5, "cantidad": 2 }
+  ]
+}
+
+### 2. Rayuela no se descontó
+# esperado: 200 stock 10
+GET {{base}}/libros/1
+
+### 3. Sigue habiendo una sola venta (la del seed)
+# esperado: 200 total 1
+# @no-cookie-jar
+GET {{base}}/ventas?size=20
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}

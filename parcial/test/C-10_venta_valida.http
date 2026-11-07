@@ -1,0 +1,64 @@
+# C-10 · Venta válida con dos renglones
+# Antes: python seed.py
+# Rayuela (id 1, 25000.00, stock 10) x2 + Respiración artificial (id 4, 27000.00, stock 3) x1
+# Total esperado: 77000.00. Stock después: Rayuela 8, Respiración 2.
+# Un movimiento "Venta" por renglón. El aviso del comprobante sale en la consola
+# de uvicorn DESPUÉS de la línea de esta respuesta.
+
+@base = http://localhost:8000
+
+### 0. Login del vendedor
+# esperado: 200
+# @name loginVendedor
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "email": "vendedor@example.com", "password": "Secreto1234!" }
+
+### 1. Venta válida
+# esperado: 201
+# precio_unitario 25000.00 y 27000.00 (copiados, no viajan en el cuerpo)
+# total 77000.00
+# cliente Lucía Fernández
+# @no-cookie-jar
+POST {{base}}/ventas
+Cookie: {{loginVendedor.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{
+  "cliente_id": 1,
+  "renglones": [
+    { "libro_id": 1, "cantidad": 2 },
+    { "libro_id": 4, "cantidad": 1 }
+  ]
+}
+
+### 2. Login del administrador (los movimientos son de ADMIN)
+# esperado: 200
+# @name loginAdmin
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "email": "admin@example.com", "password": "Secreto1234!" }
+
+### 3. Stock de Rayuela
+# esperado: 200 stock 8
+# @no-cookie-jar
+GET {{base}}/libros/1
+
+### 4. Stock de Respiración artificial
+# esperado: 200 stock 2
+# @no-cookie-jar
+GET {{base}}/libros/4
+
+### 5. Movimientos de Rayuela
+# esperado: 200, el último con motivo "Venta", cantidad -2, venta_id de la venta nueva
+# @no-cookie-jar
+GET {{base}}/libros/1/movimientos
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
+
+### 6. Movimientos de Respiración artificial
+# esperado: 200, el último con motivo "Venta", cantidad -1
+# @no-cookie-jar
+GET {{base}}/libros/4/movimientos
+Cookie: {{loginAdmin.response.headers.Set-Cookie}}
