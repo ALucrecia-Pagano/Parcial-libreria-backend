@@ -457,7 +457,7 @@ CH-03 queda fuera del camino crítico (independiente). CH-04, CH-05, CH-08, CH-0
   - `knowledge-base/07_flujos_principales.md` (flujo de login)
 
 ### [CH-08] `registro-logout-yo`
-- **Estado**: `[ ]` pendiente
+- **Estado**: `[x]` hecho (archivado 07/11/2026 en `openspec/changes/archive/2026-11-07-ch-08-registro-logout-yo/`)
 - **Objetivo**: auto-registro atómico (RN-02), cierre de sesión y `GET /auth/yo`.
 - **Entra**:
   - `POST /auth/registro` (`extra="forbid"`: nadie se registra con un rol; contraseña de tipo `PasswordBcrypt` de CH-07, sin validación propia) → 201, 409, 422. **Un solo bloque `async with uow:`** crea `usuario` + `asignacion_rol` CLIENTE + ficha de `cliente` (con `usuario_id`): o quedan las tres filas o ninguna. Hash calculado **antes** de abrir el UoW. Correo ya usado por un usuario → 409 con mensaje propio; correo ya usado por un **cliente** → 409 con otro mensaje y **no se apropia de esa ficha** ni deja filas sueltas. Ambos vía `IntegrityError` (`uq_usuario_email`, `uq_cliente_email`), sin consulta previa. Respuesta 201 sin `password_hash`.
