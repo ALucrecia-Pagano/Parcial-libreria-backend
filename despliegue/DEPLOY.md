@@ -1,6 +1,6 @@
 # Despliegue en VPS — TP Librería (Capítulos 1 a 4)
 
-- **Grupo**: `<NOMBRE>` (Pagano Amanda, Liendo Mateo, Avila Lucas, Valentini Tiziano, García Juan)
+- **Grupo**: `EDITORIAL CODEX` (Pagano Amanda, Liendo Mateo, Avila Lucas, Valentini Tiziano, García Juan)
 - **URL pública**: `http://179.199.141.99:8000`
 - **Día y hora del despliegue**: 04/11/2026, 10:37 (hora de Argentina, UTC-3)
 
