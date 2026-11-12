@@ -6,9 +6,8 @@ falla, el Unit of Work revierte venta, renglones, stock y movimientos.
 """
 from decimal import Decimal
 
-from fastapi import HTTPException, status
-
 from app.core.dependencies import roles_vigentes
+from app.core.errores import Conflicto, NoEncontrado, Prohibido
 from app.core.paginacion import Pagina, construir_pagina, validar_pagina
 from app.modules.libros.stock import aplicar_movimiento
 from app.modules.usuarios.models import Usuario
@@ -24,13 +23,13 @@ async def registrar(uow: VentasUnitOfWork, datos: VentaCreate, usuario_id: int) 
     async with uow:
         cliente = await uow.clientes.get_by_id(datos.cliente_id)
         if cliente is None:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_CLIENTE_INVALIDO)
+            raise Conflicto(_CLIENTE_INVALIDO)
 
         lineas = []
         for renglon in datos.renglones:
             libro = await uow.libros.get_by_id_including_deleted(renglon.libro_id)
             if libro is None or libro.borrado_en is not None:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_LIBRO_INVALIDO)
+                raise Conflicto(_LIBRO_INVALIDO)
             lineas.append((renglon, libro))
 
         venta = await uow.ventas.add(
@@ -54,9 +53,7 @@ async def registrar(uow: VentasUnitOfWork, datos: VentaCreate, usuario_id: int) 
         await uow.ventas.update(venta, {"total": total})
         detalle = await uow.ventas.obtener_detalle(venta.id)
         if detalle is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Venta no encontrada"
-            )
+            raise NoEncontrado("Venta no encontrada")
         return detalle
 
 
@@ -67,9 +64,7 @@ async def listar(
         if cliente_id is not None:
             cliente = await uow.clientes.get_by_id(cliente_id)
             if cliente is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, detail="Cliente no encontrado"
-                )
+                raise NoEncontrado("Cliente no encontrado")
         return await _pagina(uow, page, size, cliente_id=cliente_id)
 
 
@@ -85,17 +80,12 @@ async def obtener(uow: VentasUnitOfWork, venta_id: int, usuario: Usuario) -> Ven
     async with uow:
         venta = await uow.ventas.obtener_detalle(venta_id)
         if venta is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Venta no encontrada"
-            )
+            raise NoEncontrado("Venta no encontrada")
         roles = await roles_vigentes(uow.session, usuario.id)
         es_personal = any(rol in roles for rol in ("VENDEDOR", "ADMIN"))
         es_dueno = venta.cliente is not None and venta.cliente.usuario_id == usuario.id
         if not es_personal and not es_dueno:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="No tenés permiso para ver esta venta",
-            )
+            raise Prohibido("No tenés permiso para ver esta venta")
         return venta
 
 

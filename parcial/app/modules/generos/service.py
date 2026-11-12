@@ -4,8 +4,7 @@ Cada función recibe el Unit of Work y lo abre con `async with uow:`. El nombre
 repetido (RN-01) lo rechaza la base (uq_genero_nombre): el IntegrityError sale
 del bloque, el Unit of Work revierte y el router responde 409 con mensaje propio.
 """
-from fastapi import HTTPException, status
-
+from app.core.errores import NoEncontrado
 from app.core.paginacion import Pagina, construir_pagina, validar_pagina
 from app.modules.generos.models import Genero
 from app.modules.generos.schemas import GeneroCreate, GeneroRead
@@ -24,7 +23,7 @@ async def obtener(uow: GenerosUnitOfWork, genero_id: int) -> Genero:
     async with uow:
         genero = await uow.generos.get_by_id(genero_id)
         if genero is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Género no encontrado")
+            raise NoEncontrado("Género no encontrado")
         return genero
 
 

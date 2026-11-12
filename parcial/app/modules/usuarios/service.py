@@ -2,11 +2,11 @@
 
 from datetime import datetime, timezone
 
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import settings
 from app.core.dependencies import UsuarioActual
+from app.core.errores import Conflicto, DemasiadosIntentos, NoAutenticado, NoEncontrado
 from app.core.paginacion import Pagina, ParamsPaginacion, validar_pagina
 from app.core.security import crear_token, hashear_password, verificar_password
 from app.modules.clientes.models import Cliente
@@ -85,10 +85,7 @@ class UsuariosService:
         async with uow:
             usuario = await uow.usuarios.get_by_id(usuario_id)
             if usuario is None or not usuario.activo:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Usuario no encontrado o inactivo",
-                )
+                raise NoAutenticado("Usuario no encontrado o inactivo")
             roles_base = await uow.asignaciones.roles_vigentes(usuario.id)
 
         return UsuarioYoOut(
@@ -117,10 +114,9 @@ class UsuariosService:
         )
         if bloqueado:
             # El intento rechazado por 429 NO se registra (P-14) y responde sin consumir CPU.
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Demasiados intentos fallidos. Intente más tarde.",
-                headers={"Retry-After": str(retry_after)},
+            raise DemasiadosIntentos(
+                "Demasiados intentos fallidos. Intente más tarde.",
+                retry_after=retry_after,
             )
 
         # 2. Búsqueda del usuario en su propio bloque UoW.
@@ -132,10 +128,7 @@ class UsuariosService:
         if usuario is None:
             await registrar_intento(session_factory, datos.email, ip, exito=False)
             await verificar_password(datos.password, hash_ficticio)
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Credenciales inválidas",
-            )
+            raise NoAutenticado("Credenciales inválidas")
 
         # 4. Verificación de hash con bcrypt fuera de transacción
         password_valida = await verificar_password(
@@ -145,10 +138,7 @@ class UsuariosService:
         # 5. Usuario inactivo o contraseña errónea devuelven el mismo 401 unificado
         if not password_valida or not usuario.activo:
             await registrar_intento(session_factory, datos.email, ip, exito=False)
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Credenciales inválidas",
-            )
+            raise NoAutenticado("Credenciales inválidas")
 
         # 6. Autenticación exitosa: registrar éxito en sesión propia (reinicia la ventana)
         await registrar_intento(session_factory, datos.email, ip, exito=True)
@@ -179,10 +169,7 @@ class UsuariosService:
             datos.password_actual, usuario_actual.usuario.password_hash
         )
         if not password_valida:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Contraseña actual incorrecta",
-            )
+            raise NoAutenticado("Contraseña actual incorrecta")
 
         # 2. Hash previo fuera de la transacción
         nuevo_hash = await hashear_password(datos.password_nueva)
@@ -191,10 +178,7 @@ class UsuariosService:
         async with uow:
             usuario = await uow.usuarios.get_by_id(usuario_actual.id)
             if usuario is None or not usuario.activo:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Usuario no encontrado o inactivo",
-                )
+                raise NoAutenticado("Usuario no encontrado o inactivo")
             usuario.password_hash = nuevo_hash
             usuario.debe_cambiar_password = False
             await uow.usuarios.add(usuario)
@@ -253,10 +237,7 @@ class UsuariosService:
         async with uow:
             usuario = await uow.usuarios.get_by_id(usuario_id)
             if usuario is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Usuario no encontrado",
-                )
+                raise NoEncontrado("Usuario no encontrado")
             asignaciones = await uow.asignaciones.obtener_asignaciones(usuario_id)
             return [AsignacionRolOut.model_validate(a) for a in asignaciones]
 
@@ -272,20 +253,14 @@ class UsuariosService:
         async with uow:
             usuario = await uow.usuarios.get_by_id(usuario_id)
             if usuario is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Usuario no encontrado",
-                )
+                raise NoEncontrado("Usuario no encontrado")
 
             # Verificar si existe una asignación abierta (revocada_en IS NULL)
             abierta = await uow.asignaciones.obtener_abierta(usuario_id, datos.rol)
             if abierta is not None:
                 # Si sigue vigente (no venció), conflicto RN-03
                 if abierta.vence_en is None or abierta.vence_en > ahora:
-                    raise HTTPException(
-                        status_code=status.HTTP_409_CONFLICT,
-                        detail="El usuario ya tiene ese rol activo asignado",
-                    )
+                    raise Conflicto("El usuario ya tiene ese rol activo asignado")
                 # Si ya venció, se cierra en el mismo UoW
                 abierta.revocada_en = ahora
                 await uow.session.flush()
@@ -319,33 +294,27 @@ class UsuariosService:
         async with uow:
             usuario = await uow.usuarios.get_by_id(usuario_id)
             if usuario is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Usuario no encontrado",
-                )
+                raise NoEncontrado("Usuario no encontrado")
 
             # Buscar la asignación abierta y vigente
             asignacion = await uow.asignaciones.obtener_abierta(usuario_id, rol)
             if asignacion is None or (
                 asignacion.vence_en is not None and asignacion.vence_en <= ahora
             ):
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"El usuario no tiene una asignación activa del rol {rol}",
+                raise NoEncontrado(
+                    f"El usuario no tiene una asignación activa del rol {rol}"
                 )
 
             # RN-05: Autoprotección
             if rol == "ADMIN":
                 admins_vigentes = await uow.asignaciones.contar_admins_vigentes()
                 if admins_vigentes <= 1:
-                    raise HTTPException(
-                        status_code=status.HTTP_409_CONFLICT,
-                        detail="No se puede revocar el rol: no pueden quedar cero administradores vigentes en el sistema",
+                    raise Conflicto(
+                        "No se puede revocar el rol: no pueden quedar cero administradores vigentes en el sistema"
                     )
                 if usuario_id == admin.id:
-                    raise HTTPException(
-                        status_code=status.HTTP_409_CONFLICT,
-                        detail="Un administrador no puede revocarse su propio rol ADMIN",
+                    raise Conflicto(
+                        "Un administrador no puede revocarse su propio rol ADMIN"
                     )
 
             # Marcar revocación sin borrar la fila física

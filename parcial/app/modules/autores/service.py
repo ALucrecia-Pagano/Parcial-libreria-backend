@@ -3,8 +3,7 @@
 Cada función recibe el Unit of Work y lo abre con `async with uow:`. Un
 IntegrityError sale del bloque, el Unit of Work revierte y el router lo traduce.
 """
-from fastapi import HTTPException, status
-
+from app.core.errores import NoEncontrado
 from app.core.paginacion import Pagina, construir_pagina, validar_pagina
 from app.modules.autores.models import Autor
 from app.modules.autores.schemas import AutorCreate, AutorRead, AutorUpdate
@@ -40,6 +39,6 @@ async def actualizar(uow: AutoresUnitOfWork, autor_id: int, datos: AutorUpdate) 
 async def _buscar(uow: AutoresUnitOfWork, autor_id: int) -> Autor:
     autor = await uow.autores.get_by_id(autor_id)
     if autor is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=MENSAJE_NO_ENCONTRADO)
+        raise NoEncontrado(MENSAJE_NO_ENCONTRADO)
     return autor
 

@@ -4,8 +4,7 @@ Cada función recibe el Unit of Work y lo abre. El correo repetido y el perfil
 duplicado los rechaza la base: el IntegrityError sale del bloque, el Unit of
 Work revierte y el router lo traduce a 409. No hay consulta previa de unicidad.
 """
-from fastapi import HTTPException, status
-
+from app.core.errores import NoEncontrado
 from app.modules.clientes.models import Cliente, PerfilCliente
 from app.modules.clientes.schemas import ClienteCreate, ClienteUpdate, PerfilCreate
 from app.modules.clientes.unit_of_work import ClientesUnitOfWork
@@ -46,7 +45,5 @@ async def crear_perfil(
 async def _buscar(uow: ClientesUnitOfWork, cliente_id: int) -> Cliente:
     cliente = await uow.clientes.get_con_perfil(cliente_id)
     if cliente is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Cliente no encontrado"
-        )
+        raise NoEncontrado("Cliente no encontrado")
     return cliente

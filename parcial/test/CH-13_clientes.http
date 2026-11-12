@@ -114,6 +114,7 @@ Content-Type: application/json
 
 ### 13. Sin sesión
 # esperado: 401
+# @no-cookie-jar
 POST {{base}}/clientes
 Content-Type: application/json
 

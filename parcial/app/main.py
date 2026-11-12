@@ -17,6 +17,7 @@ from fastapi.routing import APIRoute
 from app.core.config import settings
 from app.core.database import dispose_resources, init_resources
 from app.core.dependencies import exigir_password_al_dia, requiere_rol
+from app.core.errores import ErrorDominio, manejar_error_dominio
 from app.core.security import hashear_password
 import app.modules.autores.router as autores_module
 import app.modules.clientes.router as clientes_module
@@ -38,6 +39,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
+app.add_exception_handler(ErrorDominio, manejar_error_dominio)
 
 
 def _asegurar_sin_trailing_slash(router: APIRouter) -> None:

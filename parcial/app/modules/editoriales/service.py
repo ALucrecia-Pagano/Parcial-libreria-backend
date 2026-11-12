@@ -6,8 +6,7 @@ IntegrityError sale del bloque, el Unit of Work revierte y el router lo traduce 
 409 con mensaje propio. No se consulta antes si el nombre existe: lo garantiza
 el UNIQUE uq_editorial_nombre.
 """
-from fastapi import HTTPException, status
-
+from app.core.errores import NoEncontrado
 from app.core.paginacion import Pagina, construir_pagina, validar_pagina
 from app.modules.editoriales.models import Editorial
 from app.modules.editoriales.schemas import EditorialCreate, EditorialRead, EditorialUpdate
@@ -46,5 +45,5 @@ async def actualizar(
 async def _buscar(uow: EditorialesUnitOfWork, editorial_id: int) -> Editorial:
     editorial = await uow.editoriales.get_by_id(editorial_id)
     if editorial is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Editorial no encontrada")
+        raise NoEncontrado("Editorial no encontrada")
     return editorial

@@ -757,6 +757,43 @@ CH-03 queda fuera del camino crítico (independiente). CH-04, CH-05, CH-08, CH-0
 
 ---
 
+## Change extra — Corrección post-devolución (fuera del reparto de 15)
+
+> Change agregado fuera del reparto original de 15 (`CH-01..CH-15`, 3 por integrante) para cerrar la devolución del profesor (98/100 → único indicador pendiente **U-06**). No altera la numeración ni las dependencias de `CH-01..CH-15`.
+
+### [CH-16] `errores-del-dominio-en-los-servicios`
+- **Estado**: `[x]` hecho (archivado 12/11/2026 en `openspec/changes/archive/2026-11-12-ch-16-errores-del-dominio-en-los-servicios/`)
+- **Motivo**: indicador **U-06** de la devolución del profesor (*"Los servicios no lanzan `HTTPException`: lanzan errores del dominio y se traducen a códigos HTTP"*).
+- **Objetivo**: desacoplar los siete `service.py` de `fastapi` y `HTTPException`, concentrando las excepciones de dominio y su único manejador global en `parcial/app/core/errores.py`.
+- **Entra**:
+  - Jerarquía en `parcial/app/core/errores.py`: `ErrorDominio(Exception)` (con atributo `mensaje`) y subclases `NoEncontrado` (404), `Conflicto` (409), `NoAutenticado` (401), `Prohibido` (403) y `DemasiadosIntentos` (429, con atributo `retry_after`), sin dependencia de `HTTPException`.
+  - Manejador global `manejar_error_dominio` en `parcial/app/core/errores.py`, registrado en `parcial/app/main.py` con `app.add_exception_handler(ErrorDominio, manejar_error_dominio)`, devolviendo `{"detail": mensaje}` y cabecera `Retry-After` para `DemasiadosIntentos`.
+  - Reemplazo de todos los `raise HTTPException` y eliminación de imports de `fastapi` en `parcial/app/modules/{autores,clientes,editoriales,generos,libros,usuarios,ventas}/service.py`, conservando los mismos mensajes.
+- **No entra**: cambios en `parcial/app/core/dependencies.py`, `parcial/app/core/paginacion.py` (capa HTTP), `traducir_integrity_error` de los routers, esquema ni migraciones.
+- **Governance**: MEDIO.
+- **Dependencias**: CH-01..CH-15 completos.
+- **Archivos**:
+  - Modificar: `parcial/app/core/errores.py`, `parcial/app/main.py`, `parcial/app/modules/{autores,clientes,editoriales,generos,libros,usuarios,ventas}/service.py`.
+- **.http a correr**: todos los `C-01`..`C-16` de `parcial/test/` tras `python seed.py` (mismos códigos, mismos mensajes y `Retry-After` en `C-05`), verificación sin `HTTPException`/`from fastapi` en `service.py`, y `alembic check` limpio.
+
+---
+
+## Etapa 2 Global — integración monorepo
+
+> Change fuera de los 15 del parcial: no altera la numeración CH-01..CH-15 ni sus dependencias. A partir de este change, `parcial/` pasa a `backend/`; las rutas `parcial/...` de las secciones anteriores son históricas.
+
+| Change | Nombre | Governance | Depende de | Tamaño |
+|---|---|---|---|---|
+| G-01 | `monorepo-integracion-global` | ALTO | CH-15 (o `main` estable) | G |
+
+- **Objetivo**: unificar el frontend y el backend en un monorepo desplegable, con Nginx same-origin (`/api` → `API_UPSTREAM`), backend dockerizado desde `parcial/`, CORS configurable y las pantallas conectadas a FastAPI + PostgreSQL.
+- **Entra**: mover `parcial/` a `backend/` y el runtime del frontend a `frontend/public/`; crear `backend/Dockerfile`, `frontend/Dockerfile`, `.dockerignore` y `default.conf.template`; agregar `CORS_ORIGINS`; agregar `GET /clientes` y `cliente_nombre` en `VentaRead`; cliente API, sesión por cookie, roles y mapeo DTO↔modelo; `docker-compose.yml` local y documentación EasyPanel.
+- **No entra**: reescribir el frontend con framework, migrar datos de `localStorage`, cambiar reglas de negocio/migraciones, extras C-12, Redis/caché, paginación infinita.
+- **Archivos**: `openspec/changes/monorepo-integracion-global/` (proposal, design, specs, tasks); `backend/` (desde `parcial/`); `frontend/public/`; `frontend/{Dockerfile,.dockerignore,default.conf.template}`; `backend/Dockerfile`; `docker-compose.yml`; `README.md`.
+- **Verificación**: `openspec validate --all --strict`; `docker compose up --build`; login/venta/stock/historial; 320 px, 1280 px y teclado; `.http` de `GET /clientes` y listados de ventas.
+
+---
+
 ## Matriz de cobertura
 
 ### Reglas de negocio (RN-01..RN-16)

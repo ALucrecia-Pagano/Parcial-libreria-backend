@@ -1,17 +1,83 @@
-"""Traducción de IntegrityError a 409 con mensaje propio (RN-15).
+"""Errores del dominio, manejador global HTTP y traducción de IntegrityError (RN-15).
 
-Convención para todos los módulos (D9, consigna pág. 9):
-- El servicio recibe el UnitOfWork, lo abre con `async with uow:` y deja
-  propagar el IntegrityError, para que el UnitOfWork haga rollback.
-- El router lo atrapa y lo traduce:
-      except IntegrityError as exc:
-          raise traducir_integrity_error(exc) from None
-
-Nunca se devuelve str(exc) ni str(exc.orig): tienen texto interno de la base.
-Cada change agrega acá los mensajes de sus restricciones nuevas.
+- Jerarquía `ErrorDominio(Exception)`: las reglas de negocio en los servicios
+  lanzan estas excepciones sin acoplarse a FastAPI ni a HTTPException.
+- Manejador global `manejar_error_dominio`: registrado en `app/main.py` con
+  `app.add_exception_handler(ErrorDominio, manejar_error_dominio)`.
+- `traducir_integrity_error`: lo llaman los routers al atrapar `IntegrityError`
+  de SQLAlchemy (que sale del `UnitOfWork` tras hacer rollback) para responder
+  409 con mensaje propio, sin exponer texto interno de la base.
 """
-from fastapi import HTTPException, status
+from fastapi import HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
+
+
+class ErrorDominio(Exception):
+    """Error base de dominio lanzado por los servicios."""
+
+    def __init__(self, mensaje: str) -> None:
+        super().__init__(mensaje)
+        self.mensaje = mensaje
+
+
+class NoEncontrado(ErrorDominio):
+    """Recurso inexistente o dado de baja (404)."""
+
+
+class Conflicto(ErrorDominio):
+    """Operación incompatible con las reglas o el estado actual (409)."""
+
+
+class NoAutenticado(ErrorDominio):
+    """Credenciales inválidas o sesión inexistente/inactiva (401)."""
+
+
+class Prohibido(ErrorDominio):
+    """El usuario autenticado carece de permisos para la operación (403)."""
+
+
+class DemasiadosIntentos(ErrorDominio):
+    """Límite de intentos excedido; informa segundos de espera (429)."""
+
+    def __init__(self, mensaje: str, retry_after: int) -> None:
+        super().__init__(mensaje)
+        self.retry_after = retry_after
+
+
+_CODIGOS_ERROR_DOMINIO: dict[type[ErrorDominio], int] = {
+    NoEncontrado: status.HTTP_404_NOT_FOUND,
+    Conflicto: status.HTTP_409_CONFLICT,
+    NoAutenticado: status.HTTP_401_UNAUTHORIZED,
+    Prohibido: status.HTTP_403_FORBIDDEN,
+    DemasiadosIntentos: status.HTTP_429_TOO_MANY_REQUESTS,
+}
+
+
+async def manejar_error_dominio(
+    _request: Request, exc: Exception
+) -> JSONResponse:
+    """Manejador global único: traduce ErrorDominio a JSONResponse {"detail": mensaje}."""
+    if not isinstance(exc, ErrorDominio):
+        raise exc
+    status_code = _CODIGOS_ERROR_DOMINIO.get(type(exc))
+    if status_code is None:
+        status_code = next(
+            (
+                codigo
+                for cls, codigo in _CODIGOS_ERROR_DOMINIO.items()
+                if isinstance(exc, cls)
+            ),
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+    headers: dict[str, str] | None = None
+    if isinstance(exc, DemasiadosIntentos):
+        headers = {"Retry-After": str(exc.retry_after)}
+    return JSONResponse(
+        status_code=status_code,
+        content={"detail": exc.mensaje},
+        headers=headers,
+    )
 
 MENSAJE_POR_DEFECTO = "Los datos enviados entran en conflicto con el estado actual"
 
